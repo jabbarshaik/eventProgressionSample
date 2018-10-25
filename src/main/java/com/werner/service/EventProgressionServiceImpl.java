@@ -257,11 +257,12 @@ public class EventProgressionServiceImpl implements EventProgressionService {
             transaction.setShipmentNumber(request.getShipmentNumber());
             transaction.setRezTrackingNumber(request.getTrackingNum());
 
-            if (onNetworkEvents.contains(request.getEventCode())) {
-                transaction.setStatus("A");
-            } else if (StringUtils.equalsIgnoreCase("MON", request.getEventCode())) {
+            if (StringUtils.equalsIgnoreCase("MON", request.getEventCode())) {
                 transaction.setStatus("F");
+            }else{
+                transaction.setStatus("A");
             }
+
 
             return transactionRepository.save(transaction);
 
