@@ -22,6 +22,14 @@ public class Transaction extends  BaseAuditType {
     private String segmentNumber;
     private String shipmentNumber;
     private String rezTrackingNumber;
+    private String splc;
+    private String programName;
+    private String custRefNumber;
+    private String currentEventCode;
+    private String startEventCode;
+    private String startDate;
+    private String endEventCode;
+    private String endDate;
     private String status;
 
 

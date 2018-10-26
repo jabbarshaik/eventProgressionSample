@@ -44,7 +44,15 @@ public enum EventCodeMappingEnum {
     D_X1_DROP("D_X1_DROP", Arrays.asList("Destination Street", "Placed for Unloading")),
 
     D_CD_LIVE("D_CD_LIVE", Arrays.asList("Destination Street", "Empty")),
-    D_CD_DROP("D_CD_DROP", Arrays.asList("Destination Street", "Placed for Unloading"));
+    D_CD_DROP("D_CD_DROP", Arrays.asList("Destination Street", "Placed for Unloading")),
+
+//on network events
+    RC("RC", Arrays.asList("Origin Street", "Empty")),
+    OE("OE", Arrays.asList("Origin Street", "Empty")),
+    IT("IT", Arrays.asList("Origin Street", "Empty")),
+    ESA_LIVE("ESA_LIVE", Arrays.asList("Origin Street", "Loading")),
+    ESA_DROP("ESA_DROP", Arrays.asList("Origin Street", "Loaded")),
+    MON("MON", Arrays.asList("Origin Street", "Empty"));
 
     private final String code;
     private final List<String> equipStreetStatus;

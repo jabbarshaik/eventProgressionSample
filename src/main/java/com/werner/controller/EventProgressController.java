@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 public class EventProgressController {
 
@@ -24,8 +26,8 @@ public class EventProgressController {
     EventProgressionServiceImpl service;
 
     @PostMapping(value =  "/process")
-    public ResponseEntity<EquipmentEventResponse> processEquipEvent(@RequestBody EquipmentEventRequest request){
-        return new ResponseEntity<>(service.processEquipmentEvent(request), HttpStatus.OK);
+    public ResponseEntity<EquipmentEventResponse> processEquipEvent(@RequestBody List<EquipmentEventRequest> requests){
+        return new ResponseEntity<>(service.processEquipmentEvent(requests), HttpStatus.OK);
     }
 
     @GetMapping(value =  "/getEquipLatestStatus/{equipmentNumber}")

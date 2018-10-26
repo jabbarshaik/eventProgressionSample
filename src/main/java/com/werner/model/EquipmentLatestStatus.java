@@ -7,6 +7,8 @@ import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.OneToOne;
 
 @Entity
 @Getter
@@ -24,6 +26,10 @@ public class EquipmentLatestStatus extends  BaseAuditType{
     private String equipStatus;
     private String streetStatus;
     private String segmentNumber;
+
+    @OneToOne
+    @JoinColumn(name = "transactionId", referencedColumnName = "transactionId")
+    private Transaction transaction;
 
     public EquipmentLatestStatus(){
 

@@ -21,5 +21,7 @@ public class EquipmentEventRequest implements Serializable {
     private String trackingNum;
     private String eventCarrier;
     private String eventSplc;
+    private String programName;
+    private String custRefNumber;
     private List<SegmentOrder> segmentOrders = new ArrayList<>();
 }

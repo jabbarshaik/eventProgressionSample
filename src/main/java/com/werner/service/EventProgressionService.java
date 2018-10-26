@@ -4,9 +4,11 @@ import com.werner.model.EquipmentLatestStatus;
 import com.werner.vo.EquipmentEventRequest;
 import com.werner.vo.EquipmentEventResponse;
 
+import java.util.List;
+
 public interface EventProgressionService {
 
-    EquipmentEventResponse processEquipmentEvent(EquipmentEventRequest request);
+    EquipmentEventResponse processEquipmentEvent(List<EquipmentEventRequest> requests);
 
     EquipmentLatestStatus getLatestEquipStatus(String equipmentNumber);
 }

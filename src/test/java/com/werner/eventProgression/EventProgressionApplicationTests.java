@@ -10,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import java.time.LocalDate;
+import java.util.Arrays;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest
@@ -27,7 +28,7 @@ public class EventProgressionApplicationTests {
 
 	@Test
 	public void testSendOEEvent(){
-		final EquipmentEventResponse response = service.processEquipmentEvent(prepareRequestObject("OE", "track1"));
+		final EquipmentEventResponse response = service.processEquipmentEvent(Arrays.asList(prepareRequestObject("OE", "track1")));
 	}
 
 	private EquipmentEventRequest prepareRequestObject(String eventCode,String tackingNumber) {
