@@ -27,15 +27,21 @@ public class EventProgressionApplicationTests {
 	}
 
 	@Test
-	public void testSendOEEvent(){
-		final EquipmentEventResponse response = service.processEquipmentEvent(Arrays.asList(prepareRequestObject("OE", "track1")));
+	public void testSendRCEvent(){
+		final EquipmentEventResponse response = service.processEquipmentEvent(Arrays.asList(prepareRequestObject("RC", null,"track1")));
 	}
 
-	private EquipmentEventRequest prepareRequestObject(String eventCode,String tackingNumber) {
+
+	@Test
+	public void testSendOEEvent(){
+		final EquipmentEventResponse response = service.processEquipmentEvent(Arrays.asList(prepareRequestObject("OE", "UMXU123456","track1")));
+	}
+
+	private EquipmentEventRequest prepareRequestObject(String eventCode,String equipmentNumber,String tackingNumber) {
 
 		EquipmentEventRequest request = new EquipmentEventRequest();
 
-		request.setEquipmentNumber("UMXU123456");
+		request.setEquipmentNumber(equipmentNumber);
 		request.setEventCarrier("ABC Carrier INC");
 		request.setEventCode(eventCode);
 		request.setEventDate(LocalDate.now().toString());

@@ -14,6 +14,7 @@ import com.werner.vo.SegmentOrder;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
@@ -53,9 +54,10 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
             for(EquipmentEventRequest request : requests){
                 Transaction transaction;
-
+                Transaction existingTransaction;
                 if (onNetworkEvents.contains(request.getEventCode())) {
                     transaction = prepareTransaction(request);
+                    existingTransaction = transaction;
                 } else {
                     //get the transaction object using the equipment number in the request
 
@@ -63,9 +65,17 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
                     if (byEquipNumberAndStatus == null) {
                         transaction = prepareTransaction(request);
+                        existingTransaction = transaction;
                     } else {
+                        existingTransaction = new Transaction();
+                        BeanUtils.copyProperties(byEquipNumberAndStatus,existingTransaction);
+
                         byEquipNumberAndStatus.setShipmentNumber(request.getShipmentNumber());
                         byEquipNumberAndStatus.setSegmentNumber(request.getSegmentNumber());
+                        byEquipNumberAndStatus.setCurrentEventCode(request.getEventCode());
+                        byEquipNumberAndStatus.setEquipNumber(request.getEquipmentNumber());
+
+
 
                         transaction = transactionRepository.save(byEquipNumberAndStatus);
                     }
@@ -78,7 +88,7 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
                 // Step - 3 validate business rules and save into equipment latest status
 
-                final EquipmentLatestStatus equipmentLatestStatus = prepareEquipmentLatestStatus(request);
+                final EquipmentLatestStatus equipmentLatestStatus = prepareEquipmentLatestStatus(request,existingTransaction,transaction);
 
                 prepareResponse(response, equipmentLatestStatus);
             }
@@ -108,68 +118,87 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
     }
 
-    private EquipmentLatestStatus prepareEquipmentLatestStatus(EquipmentEventRequest request) {
+    private EquipmentLatestStatus prepareEquipmentLatestStatus(EquipmentEventRequest request, Transaction existingTransaction, Transaction currentTransaction) {
 
         //step 1 : get the latest equipment status and if the event is onNetwork event save the equipment status
 
-        EquipmentLatestStatus equipmentLatestStatus = new EquipmentLatestStatus();
-        if (onNetworkEvents.contains(request.getEventCode())) {
-            equipmentLatestStatus = prepareEquipmentLatestStatusObject(equipmentLatestStatus, request, "Origin Street", "Empty");
+        EquipmentLatestStatus equipmentLatestStatus = null;
 
-            return equipmentLatestStatusRepository.save(equipmentLatestStatus);
-        } else {
-            //find the equip latest status with the equipment number from the request
+        final String[] streetAndEquipStatus = getStreetAndEquipStatus(request);
 
-            final EquipmentLatestStatus byEquipNumberLatestStatus = equipmentLatestStatusRepository.findByEquipNumber(request.getEquipmentNumber());
+        if(streetAndEquipStatus != null){
 
+            if (onNetworkEvents.contains(request.getEventCode())) {
 
-            if ((byEquipNumberLatestStatus != null && StringUtils.equalsIgnoreCase(byEquipNumberLatestStatus.getEventType(), "OE")) ||
-                    (byEquipNumberLatestStatus != null && canUpdateEquipLatestStatus(byEquipNumberLatestStatus, request))) {
+                equipmentLatestStatus = equipmentLatestStatusRepository.findByTransaction(existingTransaction);
 
-                String[] streetAndEquipStatus = getStreetAndEquipStatus(request);
+                if(equipmentLatestStatus != null){
 
-                if (streetAndEquipStatus != null) {
-                    byEquipNumberLatestStatus.setStreetStatus(streetAndEquipStatus[0]);
-                    byEquipNumberLatestStatus.setEquipStatus(streetAndEquipStatus[1]);
-                    byEquipNumberLatestStatus.setEventType(request.getEventCode());
-                    byEquipNumberLatestStatus.setEventDate(request.getEventDate());
-                    byEquipNumberLatestStatus.setSegmentNumber(request.getSegmentNumber());
-
-                    return equipmentLatestStatusRepository.save(byEquipNumberLatestStatus);
-                } else {
-                    LOGGER.error("Street and Equip Status are not found for the Event Type ::: " + request.getEventCode());
-                }
-
-            } else if (byEquipNumberLatestStatus == null) {
-
-                String[] streetAndEquipStatus = getStreetAndEquipStatus(request);
-
-                if (streetAndEquipStatus != null) {
-                    equipmentLatestStatus = prepareEquipmentLatestStatusObject(equipmentLatestStatus, request, streetAndEquipStatus[0], streetAndEquipStatus[1]);
+                    equipmentLatestStatus.setStreetStatus(streetAndEquipStatus[0]);
+                    equipmentLatestStatus.setEquipStatus(streetAndEquipStatus[1]);
+                    equipmentLatestStatus.setEquipNumber(request.getEquipmentNumber());
+                    equipmentLatestStatus.setEventType(request.getEventCode());
 
                     return equipmentLatestStatusRepository.save(equipmentLatestStatus);
-                } else {
-                    LOGGER.error("Street and Equip Status are not found for the Event Type ::: " + request.getEventCode());
-                }
-            }
-            return byEquipNumberLatestStatus;
-        }
 
+                }else{
+                     return prepareEquipmentLatestStatusObject(existingTransaction,request, streetAndEquipStatus[0], streetAndEquipStatus[1]);
+                }
+
+
+            } else {
+                //find the equip latest status with the equipment number from the request
+
+                equipmentLatestStatus = equipmentLatestStatusRepository.findByEquipNumber(request.getEquipmentNumber());
+
+
+                if ((equipmentLatestStatus != null && onNetworkEvents.contains(equipmentLatestStatus.getEventType())) ||
+                        (equipmentLatestStatus != null && canUpdateEquipLatestStatus(equipmentLatestStatus, request,existingTransaction,currentTransaction))) {
+
+                    equipmentLatestStatus.setStreetStatus(streetAndEquipStatus[0]);
+                    equipmentLatestStatus.setEquipStatus(streetAndEquipStatus[1]);
+                    equipmentLatestStatus.setEventType(request.getEventCode());
+                    equipmentLatestStatus.setEventDate(request.getEventDate());
+                    equipmentLatestStatus.setSegmentNumber(request.getSegmentNumber());
+
+                    return equipmentLatestStatusRepository.save(equipmentLatestStatus);
+
+                } else if (equipmentLatestStatus == null) {
+                    return prepareEquipmentLatestStatusObject(existingTransaction,request, streetAndEquipStatus[0], streetAndEquipStatus[1]);
+                }
+                return equipmentLatestStatus;
+            }
+
+        }else {
+            LOGGER.error("Street and Equip Status are not found for the Event Type ::: " + request.getEventCode());
+        }
+        return equipmentLatestStatus;
     }
 
-    private Boolean canUpdateEquipLatestStatus(EquipmentLatestStatus byEquipNumberLatestStatus, EquipmentEventRequest request) {
+    private Boolean canUpdateEquipLatestStatus(EquipmentLatestStatus byEquipNumberLatestStatus, EquipmentEventRequest request, Transaction existingTransaction, Transaction currentTransaction) {
 
-        final Optional<SegmentOrder> currentLatestStatusOrder = request.getSegmentOrders().stream().filter(s -> StringUtils.equalsIgnoreCase(s.getSegmentNumber(), byEquipNumberLatestStatus.getSegmentNumber())).findFirst();
+        /*
+            TODO -- need to check the exception cases
+
+            1) if we get X3 check if the current event is OA from the last segment then don't update the Equipment Latest Status --- done
+            2) if we get OA check if the current event is X3 from the next immediate segment then process
+
+         */
+
+        final Optional<SegmentOrder> previousSegmentOrder = request.getSegmentOrders().stream().filter(s -> StringUtils.equalsIgnoreCase(s.getSegmentNumber(), existingTransaction.getSegmentNumber())).findFirst();
 
         final Optional<SegmentOrder> requestedSegmentOrder = request.getSegmentOrders().stream().filter(s -> StringUtils.equalsIgnoreCase(s.getSegmentNumber(), request.getSegmentNumber())).findFirst();
 
-        if (currentLatestStatusOrder.isPresent() && requestedSegmentOrder.isPresent()) {
+        if (previousSegmentOrder.isPresent() && requestedSegmentOrder.isPresent()) {
 
-            if(StringUtils.equalsIgnoreCase("X3",request.getEventCode())){
-                return validateExceptionCase(currentLatestStatusOrder.get(),requestedSegmentOrder.get(), request,byEquipNumberLatestStatus);
-            } else if (requestedSegmentOrder.get().getPriorityOrder()  >  currentLatestStatusOrder.get().getPriorityOrder()) {
+            if(StringUtils.equalsIgnoreCase("X3",request.getEventCode())) {
+                return validateExceptionCaseForX3(previousSegmentOrder.get(),requestedSegmentOrder.get(),byEquipNumberLatestStatus);
+            }else if (StringUtils.equalsIgnoreCase("OA",request.getEventCode()) &&
+                    ! previousSegmentOrder.get().getPriorityOrder().equals(requestedSegmentOrder.get().getPriorityOrder())) {
+                    return  validateExceptionCaseForOA(previousSegmentOrder.get(),requestedSegmentOrder.get(),byEquipNumberLatestStatus);
+            } else if (requestedSegmentOrder.get().getPriorityOrder()  >  previousSegmentOrder.get().getPriorityOrder()) {
                 return Boolean.TRUE;
-            } else if (currentLatestStatusOrder.get().getPriorityOrder().equals(requestedSegmentOrder.get().getPriorityOrder())) {
+            } else if (previousSegmentOrder.get().getPriorityOrder().equals(requestedSegmentOrder.get().getPriorityOrder())) {
                 if (SegmentEventPriority.getSegmentPriority(byEquipNumberLatestStatus.getEventType()) != null &&
                         SegmentEventPriority.getSegmentPriority(request.getEventCode()) != null &&
 //                        SegmentEventPriority.getSegmentPriority(request.getEventCode()).compareTo(SegmentEventPriority.getSegmentPriority(byEquipNumberLatestStatus.getEventType())) >= 1 )
@@ -184,14 +213,29 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
     }
 
-    private Boolean validateExceptionCase(SegmentOrder currentLatestStatusOrder, SegmentOrder requestedSegmentOrder, EquipmentEventRequest request,EquipmentLatestStatus byEquipNumberLatestStatus) {
+    /*
+            if we get X3 check if the current event is OA from the last segment then don't update the Equipment Latest Status --- done
+     */
+    private Boolean validateExceptionCaseForX3(SegmentOrder previousSegmentOrder, SegmentOrder requestedSegmentOrder,EquipmentLatestStatus byEquipNumberLatestStatus) {
 
-
-         if(StringUtils.equalsIgnoreCase("X3",request.getEventCode())
-                && StringUtils.equalsIgnoreCase("OA",byEquipNumberLatestStatus.getEventType()) && currentLatestStatusOrder.getPriorityOrder().equals(requestedSegmentOrder.getPriorityOrder() - 1)){
+         if(StringUtils.equalsIgnoreCase("OA",byEquipNumberLatestStatus.getEventType()) &&
+                        previousSegmentOrder.getPriorityOrder().equals(requestedSegmentOrder.getPriorityOrder() - 1)){
             return  Boolean.FALSE;
         }
         return  Boolean.TRUE;
+    }
+
+    /*
+          if we get OA check if the current event is X3 from the next immediate segment then process
+     */
+    private Boolean validateExceptionCaseForOA(SegmentOrder previousSegmentOrder, SegmentOrder requestedSegmentOrder,EquipmentLatestStatus byEquipNumberLatestStatus) {
+
+
+        if(StringUtils.equalsIgnoreCase("X3",byEquipNumberLatestStatus.getEventType()) &&
+                requestedSegmentOrder.getPriorityOrder() == previousSegmentOrder.getPriorityOrder() -1){
+            return  Boolean.TRUE;
+        }
+        return  Boolean.FALSE;
     }
 
     private String[] getStreetAndEquipStatus(EquipmentEventRequest request) {
@@ -219,8 +263,9 @@ public class EventProgressionServiceImpl implements EventProgressionService {
         return null;
     }
 
-    private EquipmentLatestStatus prepareEquipmentLatestStatusObject(EquipmentLatestStatus latestStatus, EquipmentEventRequest request, String streetStatus, String equipmentStatus) {
+    private EquipmentLatestStatus prepareEquipmentLatestStatusObject(Transaction transaction,EquipmentEventRequest request, String streetStatus, String equipmentStatus) {
 
+        EquipmentLatestStatus latestStatus = new EquipmentLatestStatus();
 
         latestStatus.setEquipNumber(request.getEquipmentNumber());
         latestStatus.setEquipStatus(equipmentStatus);
@@ -228,8 +273,9 @@ public class EventProgressionServiceImpl implements EventProgressionService {
         latestStatus.setEventType(request.getEventCode());
         latestStatus.setEventDate(request.getEventDate());
         latestStatus.setSegmentNumber(request.getSegmentNumber());
+        latestStatus.setTransaction(transaction);
 
-        return latestStatus;
+        return equipmentLatestStatusRepository.save(latestStatus);
     }
 
     private void prepareStatusHistoryLog(Transaction transaction, EquipmentEventRequest request) {
@@ -300,10 +346,12 @@ public class EventProgressionServiceImpl implements EventProgressionService {
             return transactionRepository.save(transaction);
 
         }else{
+
             dbTransactionStatus.setEquipNumber(request.getEquipmentNumber());
             dbTransactionStatus.setRezTrackingNumber(request.getTrackingNum());
             dbTransactionStatus.setCurrentEventCode(request.getEventCode());
             dbTransactionStatus.setShipmentNumber(request.getShipmentNumber());
+            dbTransactionStatus.setSegmentNumber(request.getSegmentNumber());
 
             return transactionRepository.save(dbTransactionStatus);
         }
