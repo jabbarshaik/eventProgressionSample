@@ -16,5 +16,4 @@ public class EquipmentEventResponse implements Serializable {
     private String streetStatus;
     private String message;
     private String errorMessage;
-
 }
