@@ -251,8 +251,8 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                 equipmentLatestStatus = equipmentLatestStatusRepository.findByTransaction(existingTransaction);
 
                 if (equipmentLatestStatus == null && existingTransaction.getStatus().equalsIgnoreCase("P")) {
-                    return prepareEquipmentLatestStatusObject(existingTransaction, request, streetAndEquipStatus[0], streetAndEquipStatus[1]);
-                } else if (equipmentLatestStatus != null) {
+                    return prepareEquipmentLatestStatusObject(newTransaction, request, streetAndEquipStatus[0], streetAndEquipStatus[1]);
+                } else if (equipmentLatestStatus != null && ! StringUtils.equalsIgnoreCase("A", equipmentLatestStatus.getEventType())) {
 
                     equipmentLatestStatus.setStreetStatus(streetAndEquipStatus[0]);
                     equipmentLatestStatus.setEquipStatus(streetAndEquipStatus[1]);
