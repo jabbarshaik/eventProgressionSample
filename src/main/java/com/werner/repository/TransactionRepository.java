@@ -23,6 +23,8 @@ public interface TransactionRepository extends CrudRepository<Transaction,Long> 
 
     Transaction findByEquipNumberAndShipmentNumber(String equipNumber, String shipmentNumber);
 
+    Transaction findByEquipNumberAndShipmentNumberAndStatus(String equipNumber, String shipmentNumber, String status);
+
 
     List<Transaction> findByShipmentNumberAndStatus(String shipmentNumber, String status);
 

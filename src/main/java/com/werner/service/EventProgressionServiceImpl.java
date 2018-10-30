@@ -32,7 +32,7 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
     private List<String> onNetworkEvents = Arrays.asList("OE", "IT", "ESA", "MON", "RC");
 
-    private List<String> offNetworkEvents = Arrays.asList("IF", "IE", "ID", "RX", "RE");
+    private List<String> offNetworkEvents = Arrays.asList("IF", "IE", "ID", "MOFN", "SOFN");
 
     @Autowired
     TransactionRepository transactionRepository;
@@ -58,6 +58,43 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                 if (onNetworkEvents.contains(request.getEventCode())) {
                     transaction = prepareTransaction(request, "P");
                     existingTransaction = transaction;
+                }else if (offNetworkEvents.contains(request.getEventCode())){
+                    /*
+                    FIND TRANSACTIONS BY TRACKING NUMBER
+                    IF EXISTS
+                        UPDATE THEM AS HISTORIC
+                    IF NOT EXISTS
+                        FIND ACTIVE BY EQUIPMENT NUMBER AND SHIPMENT NUMBER
+                           IF EXISTS
+                                UPDATE THEM AS HISTORIC
+                           IF NOT EXISTS
+                           //TODO NOT SURE ON HOW TO HANDLE SOFN
+                                CREATE TRANSACTION AS 'H'
+                     */
+
+                    final Transaction byRezTrackingNumber = transactionRepository.findByRezTrackingNumber(request.getTrackingNum());
+
+                    if(byRezTrackingNumber != null){
+
+                         byRezTrackingNumber.setStatus("H");
+                         byRezTrackingNumber.setEndDate(LocalDateTime.now().toString());
+                         byRezTrackingNumber.setEndEventCode(request.getEventCode());
+
+                         transaction = transactionRepository.save(byRezTrackingNumber);
+                         existingTransaction = transaction;
+                    }else {
+                        final Transaction activeTransByEquipAndShipment = transactionRepository.findByEquipNumberAndShipmentNumberAndStatus(request.getEquipmentNumber(), request.getShipmentNumber(), "A");
+
+                        if(activeTransByEquipAndShipment != null){
+                            activeTransByEquipAndShipment.setStatus("H");
+                            activeTransByEquipAndShipment.setEndDate(LocalDateTime.now().toString());
+                            activeTransByEquipAndShipment.setEndEventCode(request.getEventCode());
+
+                            transaction = transactionRepository.save(activeTransByEquipAndShipment);
+                            existingTransaction = transaction;
+                        }
+                    }
+
                 } else {
                     /*
                     CHECK FOR SHIPMENT NUMBER IN REQUEST
@@ -184,11 +221,15 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
                                 BeanUtils.copyProperties(byEquipNumberAndRezTrackingNumberNotNull, existingTransaction);
 
-                                byEquipNumberAndRezTrackingNumberNotNull.setShipmentNumber(request.getShipmentNumber());
-                                byEquipNumberAndRezTrackingNumberNotNull.setSegmentNumber(request.getSegmentNumber());
+                                if (!request.getSegmentType().equalsIgnoreCase("ER")){
+                                    byEquipNumberAndRezTrackingNumberNotNull.setShipmentNumber(request.getShipmentNumber());
+                                    byEquipNumberAndRezTrackingNumberNotNull.setSegmentNumber(request.getSegmentNumber());
+                                }
                                 byEquipNumberAndRezTrackingNumberNotNull.setCurrentEventCode(request.getEventCode());
                                 byEquipNumberAndRezTrackingNumberNotNull.setEquipNumber(request.getEquipmentNumber());
-                                byEquipNumberAndRezTrackingNumberNotNull.setStatus("A");
+                                if (StringUtils.equalsIgnoreCase(byEquipNumberAndRezTrackingNumberNotNull.getStatus(), "P")){
+                                    byEquipNumberAndRezTrackingNumberNotNull.setStatus("A");
+                                }
 
                                 transaction = transactionRepository.save(byEquipNumberAndRezTrackingNumberNotNull);
                             }
@@ -253,33 +294,31 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
                 if (equipmentLatestStatus == null && existingTransaction.getStatus().equalsIgnoreCase("P")) {
                     return prepareEquipmentLatestStatusObject(newTransaction, request, streetAndEquipStatus[0], streetAndEquipStatus[1]);
-                } else if (equipmentLatestStatus != null && ! StringUtils.equalsIgnoreCase("A", equipmentLatestStatus.getEventType())) {
+                } else if (equipmentLatestStatus != null && existingTransaction.getStatus().equalsIgnoreCase("P")) {
 
                     equipmentLatestStatus.setStreetStatus(streetAndEquipStatus[0]);
                     equipmentLatestStatus.setEquipStatus(streetAndEquipStatus[1]);
                     equipmentLatestStatus.setEquipNumber(request.getEquipmentNumber());
                     equipmentLatestStatus.setEventType(request.getEventCode());
                     equipmentLatestStatus.setTransaction(newTransaction);
+                    equipmentLatestStatus.setLoadOption(request.getLoadOption());
 
                     return equipmentLatestStatusRepository.save(equipmentLatestStatus);
                 }
 
+            } else if (offNetworkEvents.contains(request.getEventCode()) && existingTransaction != null) {
 
-                /*if (equipmentLatestStatus == null) {
+                equipmentLatestStatus = equipmentLatestStatusRepository.findByTransaction(existingTransaction);
 
-                   *//* equipmentLatestStatus.setStreetStatus(streetAndEquipStatus[0]);
-                    equipmentLatestStatus.setEquipStatus(streetAndEquipStatus[1]);
-                    equipmentLatestStatus.setEquipNumber(request.getEquipmentNumber());
+                if(equipmentLatestStatus != null){
+                    equipmentLatestStatus.setStreetStatus("OFNET");
+                    equipmentLatestStatus.setEquipStatus("EMPTY");
                     equipmentLatestStatus.setEventType(request.getEventCode());
 
-                    return equipmentLatestStatusRepository.save(equipmentLatestStatus);*//*
+                    return equipmentLatestStatusRepository.save(equipmentLatestStatus);
+                }
 
-                } else {
-                    return prepareEquipmentLatestStatusObject(existingTransaction, request, streetAndEquipStatus[0], streetAndEquipStatus[1]);
-                }*/
-
-
-            } else {
+            }else {
                 //find the equip latest status with the equipment number from the request
 
                 equipmentLatestStatus = equipmentLatestStatusRepository.findByEquipNumber(request.getEquipmentNumber());
@@ -294,6 +333,7 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                     equipmentLatestStatus.setEventDate(request.getEventDate());
                     equipmentLatestStatus.setSegmentNumber(request.getSegmentNumber());
                     equipmentLatestStatus.setTransaction(newTransaction);
+                    equipmentLatestStatus.setLoadOption(request.getLoadOption());
 
 
                     return equipmentLatestStatusRepository.save(equipmentLatestStatus);
@@ -320,6 +360,15 @@ public class EventProgressionServiceImpl implements EventProgressionService {
             2) if we get OA check if the current event is X3 from the next immediate segment then process
 
          */
+
+        // TODO --- need to save segment priority
+   /*     if (StringUtils.isNotBlank(request.getSegmentType()) && request.getSegmentType().equalsIgnoreCase("ER")){
+            *//*
+            Step 1: Get ELS based on Equipment number
+            Step 2: Get the previous segment order based on the segment number from step 1
+             *//*
+
+        }*/
 
         final Optional<SegmentOrder> previousSegmentOrder = request.getSegmentOrders().stream().filter(s -> StringUtils.equalsIgnoreCase(s.getSegmentNumber(), byEquipNumberLatestStatus.getSegmentNumber())).findFirst();
 
@@ -386,6 +435,8 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                 List<String> code = Arrays.asList(request.getEventCode(), request.getLoadOption());
                 preparingJoinString = code.stream().collect(Collectors.joining("_"));
             }
+        } else if (offNetworkEvents.contains(request.getEventCode())) {
+            preparingJoinString = request.getEventCode();
         } else if (StringUtils.isNotEmpty(request.getLoadOption())) {
             List<String> code = Arrays.asList(request.getSegmentType(), request.getEventCode(), request.getLoadOption());
             preparingJoinString = code.stream().collect(Collectors.joining("_"));
@@ -414,6 +465,7 @@ public class EventProgressionServiceImpl implements EventProgressionService {
         latestStatus.setEventDate(request.getEventDate());
         latestStatus.setSegmentNumber(request.getSegmentNumber());
         latestStatus.setTransaction(transaction);
+        latestStatus.setLoadOption(request.getLoadOption());
 
         return equipmentLatestStatusRepository.save(latestStatus);
     }
@@ -452,18 +504,31 @@ public class EventProgressionServiceImpl implements EventProgressionService {
         } else if (StringUtils.equalsIgnoreCase("OE", request.getEventCode())) {
             dbTransactionStatus = transactionRepository.findByRezTrackingNumber(request.getTrackingNum());
         } else if (StringUtils.equalsIgnoreCase("ESA", request.getEventCode())) {
-
-            dbTransactionStatus = transactionRepository.findByEquipNumberAndShipmentNumber(request.getEquipmentNumber(), request.getShipmentNumber());
-
-            if (dbTransactionStatus != null) {
-
-                // if transaction  is Active or Historic  make ESA as ESA ... return that transaction
-
-                if (StringUtils.equalsIgnoreCase("A", dbTransactionStatus.getStatus()) || StringUtils.equalsIgnoreCase("H", dbTransactionStatus.getStatus())) {
-                    return dbTransactionStatus;
+            /*
+            IF SEGMENT TYPE IS ER
+                STEP 1: FIND THE EQUIPMENT LOAD OPTION FROM ELS
+                IF DROP
+                    FIND ACTIVE TRANSACTION BY EQUIPMENT NUMBER
+                ELSE
+                    FIND ACTIVE TRANSACTION BY EQUIPMENT AND SHIPMENT NUMBER
+             */
+            if (StringUtils.isNotBlank(request.getSegmentType()) && request.getSegmentType().equalsIgnoreCase("ER")){
+                final EquipmentLatestStatus byEquipNumber = equipmentLatestStatusRepository.findByEquipNumber(request.getEquipmentNumber());
+                if(byEquipNumber.getLoadOption().equalsIgnoreCase("DROP")){
+                    dbTransactionStatus = transactionRepository.findByEquipNumberAndStatus(request.getEquipmentNumber(), "A");
+                }else{
+                    dbTransactionStatus = transactionRepository.findByEquipNumberAndShipmentNumber(request.getEquipmentNumber(), request.getShipmentNumber());
                 }
+            }else{
+                dbTransactionStatus = transactionRepository.findByEquipNumberAndShipmentNumber(request.getEquipmentNumber(), request.getShipmentNumber());
+            }
 
-                if (StringUtils.equalsIgnoreCase("P", dbTransactionStatus.getStatus())) {
+
+/*
+            if (dbTransactionStatus != null) {
+                if (StringUtils.equalsIgnoreCase("A", dbTransactionStatus.getStatus()) || StringUtils.equalsIgnoreCase("H", dbTransactionStatus.getStatus()) ||
+                        StringUtils.equalsIgnoreCase("P", dbTransactionStatus.getStatus())) {
+
                     return dbTransactionStatus;
                 }
 
@@ -473,14 +538,14 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                 //Merge update transaction with shp number
                 //step 2: if not exists
                 //Do nothing
-
+*//*
                 if (StringUtils.equalsIgnoreCase("P", dbTransactionStatus.getStatus()) || StringUtils.equalsIgnoreCase("A", dbTransactionStatus.getStatus())) {
                     dbTransactionStatus.setShipmentNumber(request.getShipmentNumber());
 
                     return transactionRepository.save(dbTransactionStatus);
-                }
+                }*//*
 
-            }
+            }*/
         } else if (StringUtils.equalsIgnoreCase("IT", request.getEventCode())) {
             dbTransactionStatus = transactionRepository.findByRezTrackingNumber(request.getTrackingNum());
         } else {
@@ -612,10 +677,20 @@ public class EventProgressionServiceImpl implements EventProgressionService {
         } else {
 
             dbTransactionStatus.setEquipNumber(request.getEquipmentNumber());
-            dbTransactionStatus.setRezTrackingNumber(request.getTrackingNum());
+
+            if(StringUtils.isNotEmpty(request.getTrackingNum()) && StringUtils.isBlank(dbTransactionStatus.getRezTrackingNumber())){
+                dbTransactionStatus.setRezTrackingNumber(request.getTrackingNum());
+            }
+
             dbTransactionStatus.setCurrentEventCode(request.getEventCode());
-            dbTransactionStatus.setShipmentNumber(request.getShipmentNumber());
-            dbTransactionStatus.setSegmentNumber(request.getSegmentNumber());
+
+            if(StringUtils.isNotEmpty(request.getShipmentNumber()) && StringUtils.isBlank(dbTransactionStatus.getShipmentNumber())){
+                dbTransactionStatus.setShipmentNumber(request.getShipmentNumber());
+            }
+
+            if(StringUtils.isNotEmpty(request.getSegmentNumber())&& StringUtils.isBlank(dbTransactionStatus.getSegmentNumber())){
+                dbTransactionStatus.setSegmentNumber(request.getSegmentNumber());
+            }
 
             return transactionRepository.save(dbTransactionStatus);
         }

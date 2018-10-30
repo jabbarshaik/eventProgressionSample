@@ -27,6 +27,8 @@ public class EquipmentLatestStatus extends  BaseAuditType{
     private String streetStatus;
     private String segmentNumber;
 
+    private String loadOption;
+
     @OneToOne
     @JoinColumn(name = "transactionId", referencedColumnName = "transactionId")
     private Transaction transaction;

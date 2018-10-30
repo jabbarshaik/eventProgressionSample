@@ -52,7 +52,16 @@ public enum EventCodeMappingEnum {
     IT("IT", Arrays.asList("Origin Street", "Empty")),
     ESA_LIVE("ESA_LIVE", Arrays.asList("Origin Street", "Loading")),
     ESA_DROP("ESA_DROP", Arrays.asList("Origin Street", "Loaded")),
-    MON("MON", Arrays.asList("Origin Street", "Empty"));
+    MON("MON", Arrays.asList("Origin Street", "Empty")),
+
+    //off network events
+
+   // ("IF", "IE", "ID", "MOFN", "SOFN");
+   IF("IF", Arrays.asList("Off Network", "Empty")),
+    IE("IE", Arrays.asList("Off Network", "Empty")),
+    ID("ID", Arrays.asList("Off Network", "Empty")),
+    MOFN("MOFN", Arrays.asList("Off Network", "Empty")),
+    SOFN("SOFN", Arrays.asList("Off Network", "Empty"));
 
     private final String code;
     private final List<String> equipStreetStatus;
