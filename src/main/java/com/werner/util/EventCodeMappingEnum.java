@@ -21,17 +21,61 @@ public enum EventCodeMappingEnum {
     O_CD_LIVE("O_CD_LIVE", Arrays.asList("Origin Ramp", "Loaded")),
     O_CD_DROP("O_CD_DROP", Arrays.asList("Origin Ramp", "Loaded")),
 
+    X_X3("X_X3", Arrays.asList("Destination Ramp", "Loaded")),
+    X_AF("X_AF", Arrays.asList("Crosstown Transit", "Loaded")),
+    X_X1("X_X1", Arrays.asList("Origin Ramp", "Loaded")),
+    X_CD("X_CD", Arrays.asList("Origin Ramp", "Loaded")),
+
+// I("I",1),IL("IL",2), RL("RL",3),ETD("ETD",4),ETA("ETA",5),LPH("LPH", 6),DERAMPED("DERAMPED", 7), ETG("ETG",8),NT("NT",9),NF("NF",10),OA("OA",11);
+
+
     INGATE("R_I", Arrays.asList("Origin Ramp", "Loaded")),
+
+    IL("R_IL", Arrays.asList("Origin Ramp", "Loaded")),
+
     RL("R_RL", Arrays.asList("Rail Transit", "Loaded")),
 
+    ETD("R_ETD", Arrays.asList("Rail Transit", "Loaded")),
+
+    ETA("R_ETA", Arrays.asList("Rail Transit", "Loaded")),
+
+    LPH("R_LPH", Arrays.asList("Rail Transit", "Loaded")),
+
+    DERAMPED("R_DERAMPED", Arrays.asList("Destination Ramp", "Loaded")),
+
+    ETG("R_ETG", Arrays.asList("Destination Ramp", "Loaded")),
+
     NT("R_NT", Arrays.asList("Destination Ramp", "Loaded")),
+
+    NF("R_NF", Arrays.asList("Destination Ramp", "Loaded")),
+
     OA("R_OA", Arrays.asList("Destination Transit", "Loaded")),
 
-    ER_INGATE("ER_I", Arrays.asList("Empty Origin Ramp", "Empty")),
-    ER_RL("ER_RL", Arrays.asList("Empty Rail Transit", "Empty")),
+    X_OA("RX_OA", Arrays.asList("Crosstown Transit", "Loaded")),
 
-    ER_NT("ER_NT", Arrays.asList("Empty Destination Ramp", "Empty")),
-    ER_OA("ER_OA", Arrays.asList("Empty Destination Street", "Empty")),
+
+    ER_INGATE("ER_I", Arrays.asList("Origin Ramp", "Empty")),
+
+    ER_IL("ER_IL", Arrays.asList("Origin Ramp", "Empty")),
+
+    ER_RL("ER_RL", Arrays.asList("Rail Transit", "Empty")),
+
+    ER_ETD("ER_ETD", Arrays.asList("Rail Transit", "Empty")),
+
+    ER_ETA("ER_ETA", Arrays.asList("Rail Transit", "Empty")),
+
+    ER_LPH("ER_LPH", Arrays.asList("Rail Transit", "Empty")),
+
+    ER_DERAMPED("ER_DERAMPED", Arrays.asList("Destination Ramp", "Empty")),
+
+    ER_ETG("ER_ETG", Arrays.asList("Destination Ramp", "Empty")),
+
+    ER_NT("ER_NT", Arrays.asList("Destination Ramp", "Empty")),
+
+    ER_NF("ER_NF", Arrays.asList("Destination Ramp", "Empty")),
+
+    ER_OA("ER_OA", Arrays.asList("Destination Transit", "Empty")),
+
 
 
     D_X3_LIVE("D_X3_LIVE", Arrays.asList("Destination Ramp", "Loaded")),
