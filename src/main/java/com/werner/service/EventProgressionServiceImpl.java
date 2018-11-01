@@ -430,8 +430,12 @@ public class EventProgressionServiceImpl implements EventProgressionService {
      */
     private Boolean validateExceptionCaseForX3(SegmentOrder previousSegmentOrder, SegmentOrder requestedSegmentOrder, EquipmentLatestStatus byEquipNumberLatestStatus) {
 
-        if (StringUtils.equalsIgnoreCase("OA", byEquipNumberLatestStatus.getEventType()) &&
-                previousSegmentOrder.getPriorityOrder().equals(requestedSegmentOrder.getPriorityOrder() - 1)) {
+        if(requestedSegmentOrder.getPriorityOrder() -1 == 0 ){
+           return  requestedSegmentOrder.getPriorityOrder() > previousSegmentOrder.getPriorityOrder() ;
+
+        }else  if (previousSegmentOrder.getPriorityOrder().equals(requestedSegmentOrder.getPriorityOrder() - 1) &&
+                StringUtils.equalsIgnoreCase("OA", byEquipNumberLatestStatus.getEventType())
+                ) {
             return Boolean.FALSE;
         }
         return Boolean.TRUE;
