@@ -693,7 +693,7 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                         create transaction
              */
 
-            if(StringUtils.equalsIgnoreCase("IT", request.getEventCode())){
+            /*if(StringUtils.equalsIgnoreCase("IT", request.getEventCode())){
 
                 final Transaction byEquipNumberAndStatus = transactionRepository.findByEquipNumberAndStatus(request.getEquipmentNumber(), "A");
 
@@ -702,7 +702,7 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
                     transactionRepository.save(byEquipNumberAndStatus);
                 }
-            }
+            }*/
 
             Transaction transaction = new Transaction();
 
