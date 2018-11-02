@@ -6,8 +6,11 @@ import com.werner.model.Transaction;
 import com.werner.repository.EquipmentLatestStatusRepository;
 import com.werner.repository.StatusHistoryLogRepository;
 import com.werner.repository.TransactionRepository;
+import com.werner.util.BundledSegmentEventPriority;
+import com.werner.util.DestinationBundledSegmentEventPriority;
 import com.werner.util.DraySegmentEventPriority;
 import com.werner.util.EventCodeMappingEnum;
+import com.werner.util.OriginBundledSegmentEventPriority;
 import com.werner.util.RailSegmentEventPriority;
 import com.werner.vo.EquipmentEventRequest;
 import com.werner.vo.EquipmentEventResponse;
@@ -425,10 +428,17 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                     return Boolean.TRUE;
                 } else if (previousSegmentOrder.get().getPriorityOrder().equals(requestedSegmentOrder.get().getPriorityOrder())) {
 
+
                     if (RailSegmentEventPriority.getRailSegmentEventPriority(request.getEventCode()) != null && Arrays.asList("R", "ER").contains(requestedSegmentOrder.get().getSegmentType())) {
                         return RailSegmentEventPriority.getRailSegmentEventPriority(request.getEventCode()) > RailSegmentEventPriority.getRailSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
                     } else if (DraySegmentEventPriority.getDraySegmentEventPriority(request.getEventCode()) != null && Arrays.asList("O", "D", "X").contains(requestedSegmentOrder.get().getSegmentType())) {
                         return DraySegmentEventPriority.getDraySegmentEventPriority(request.getEventCode()) > DraySegmentEventPriority.getDraySegmentEventPriority(byEquipNumberLatestStatus.getEventType());
+                    } else if(BundledSegmentEventPriority.getBundledSegmentEventPriority(request.getEventCode()) != null && Arrays.asList("B").contains(requestedSegmentOrder.get().getSegmentType())){
+                        return BundledSegmentEventPriority.getBundledSegmentEventPriority(request.getEventCode()) > BundledSegmentEventPriority.getBundledSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
+                    } else if(OriginBundledSegmentEventPriority.getOriginBundledSegmentEventPriority(request.getEventCode()) != null && Arrays.asList("OB").contains(requestedSegmentOrder.get().getSegmentType())){
+                        return OriginBundledSegmentEventPriority.getOriginBundledSegmentEventPriority(request.getEventCode()) > OriginBundledSegmentEventPriority.getOriginBundledSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
+                    } else if(DestinationBundledSegmentEventPriority.getDestinationBundledSegmentEventPriority(request.getEventCode()) != null && Arrays.asList("DB").contains(requestedSegmentOrder.get().getSegmentType())){
+                        return DestinationBundledSegmentEventPriority.getDestinationBundledSegmentEventPriority(request.getEventCode()) > DestinationBundledSegmentEventPriority.getDestinationBundledSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
                     }
                 /*if (SegmentEventPriority.getSegmentPriority(byEquipNumberLatestStatus.getEventType()) != null &&
                         SegmentEventPriority.getSegmentPriority(request.getEventCode()) != null &&
@@ -588,16 +598,9 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
     }
 
-    private Transaction prepareTransaction(EquipmentEventRequest request, String transactionStatus) {
 
-        final Transaction dbTransactionStatus;
-
-        if (StringUtils.equalsIgnoreCase("RC", request.getEventCode())) {
-            dbTransactionStatus = transactionRepository.findByRezTrackingNumber(request.getTrackingNum());
-        } else if (StringUtils.equalsIgnoreCase("OE", request.getEventCode())) {
-            dbTransactionStatus = transactionRepository.findByRezTrackingNumber(request.getTrackingNum());
-        } else if (StringUtils.equalsIgnoreCase("ESA", request.getEventCode())) {
-            /*
+    private Transaction validateESAforTransaction(EquipmentEventRequest request){
+        /*
             IF SEGMENT TYPE IS ER
                 STEP 1: FIND THE EQUIPMENT LOAD OPTION FROM ELS
                 IF DROP
@@ -605,42 +608,26 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                 ELSE
                     FIND ACTIVE TRANSACTION BY EQUIPMENT AND SHIPMENT NUMBER
              */
-            if (StringUtils.isNotBlank(request.getSegmentType()) && request.getSegmentType().equalsIgnoreCase("ER")){
-                final EquipmentLatestStatus byEquipNumber = equipmentLatestStatusRepository.findByEquipNumber(request.getEquipmentNumber());
-                if(byEquipNumber.getLoadOption().equalsIgnoreCase("DROP")){
-                    dbTransactionStatus = transactionRepository.findByEquipNumberAndStatus(request.getEquipmentNumber(), "A");
-                }else{
-                    dbTransactionStatus = transactionRepository.findByEquipNumberAndShipmentNumber(request.getEquipmentNumber(), request.getShipmentNumber());
-                }
+        if (StringUtils.isNotBlank(request.getSegmentType()) && request.getSegmentType().equalsIgnoreCase("ER")){
+            final EquipmentLatestStatus byEquipNumber = equipmentLatestStatusRepository.findByEquipNumber(request.getEquipmentNumber());
+            if(byEquipNumber.getLoadOption().equalsIgnoreCase("DROP")){
+               return transactionRepository.findByEquipNumberAndStatus(request.getEquipmentNumber(), "A");
             }else{
-                dbTransactionStatus = transactionRepository.findByEquipNumberAndShipmentNumber(request.getEquipmentNumber(), request.getShipmentNumber());
+                return transactionRepository.findByEquipNumberAndShipmentNumber(request.getEquipmentNumber(), request.getShipmentNumber());
             }
+        }else{
+            return transactionRepository.findByEquipNumberAndShipmentNumber(request.getEquipmentNumber(), request.getShipmentNumber());
+        }
+    }
 
+    private Transaction prepareTransaction(EquipmentEventRequest request, String transactionStatus) {
 
-/*
-            if (dbTransactionStatus != null) {
-                if (StringUtils.equalsIgnoreCase("A", dbTransactionStatus.getStatus()) || StringUtils.equalsIgnoreCase("H", dbTransactionStatus.getStatus()) ||
-                        StringUtils.equalsIgnoreCase("P", dbTransactionStatus.getStatus())) {
+        final Transaction dbTransactionStatus;
 
-                    return dbTransactionStatus;
-                }
-
-                //Find transcation based on equipment number only
-                //Step 1: if Exists
-                ///if Pending/Active
-                //Merge update transaction with shp number
-                //step 2: if not exists
-                //Do nothing
-*//*
-                if (StringUtils.equalsIgnoreCase("P", dbTransactionStatus.getStatus()) || StringUtils.equalsIgnoreCase("A", dbTransactionStatus.getStatus())) {
-                    dbTransactionStatus.setShipmentNumber(request.getShipmentNumber());
-
-                    return transactionRepository.save(dbTransactionStatus);
-                }*//*
-
-            }*/
-        } else if (StringUtils.equalsIgnoreCase("IT", request.getEventCode())) {
+        if (Arrays.asList("RC","OE","IT").contains(request.getEventCode())) {
             dbTransactionStatus = transactionRepository.findByRezTrackingNumber(request.getTrackingNum());
+        }  else if (StringUtils.equalsIgnoreCase("ESA", request.getEventCode())) {
+            dbTransactionStatus = validateESAforTransaction(request);
         } else {
             dbTransactionStatus = transactionRepository.findByEquipNumberAndStatus(request.getEquipmentNumber(), "A");
         }

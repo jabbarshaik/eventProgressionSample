@@ -21,6 +21,39 @@ public enum EventCodeMappingEnum {
     O_CD_LIVE("O_CD_LIVE", Arrays.asList("Origin Ramp", "Loaded")),
     O_CD_DROP("O_CD_DROP", Arrays.asList("Origin Ramp", "Loaded")),
 
+
+    B_X3_LIVE("B_X3_LIVE", Arrays.asList("Origin Street", "Loading")),
+    B_X3_DROP("B_X3_DROP", Arrays.asList("Origin Street", "Loaded")),
+
+    B_AF_LIVE("B_AF_LIVE", Arrays.asList("Bundled Transit", "Loaded")),
+    B_AF_DROP("B_AF_DROP", Arrays.asList("Bundled Transit", "Loaded")),
+
+    B_X1_LIVE("B_X1_LIVE", Arrays.asList("Destination Street", "Unloading")),
+    B_X1_DROP("B_X1_DROP", Arrays.asList("Destination Street", "Placed for Unloading")),
+
+    B_CD_LIVE("B_CD_LIVE", Arrays.asList("Destination Street", "Empty")),
+    B_CD_DROP("B_CD_DROP", Arrays.asList("Destination Street", "Placed for Unloading")),
+
+    OB_X3_LIVE("OB_X3_LIVE", Arrays.asList("Origin Street", "Loading")),
+    OB_X3_DROP("OB_X3_DROP", Arrays.asList("Origin Street", "Loaded")),
+
+    OB_AF_LIVE("OB_AF_LIVE", Arrays.asList("Rail Transit", "Loaded")),
+    OB_AF_DROP("OB_AF_DROP", Arrays.asList("Rail Transit", "Loaded")),
+
+    OB_NT("OB_NT", Arrays.asList("Destination Ramp", "Loaded")),
+    OB_OA("OB_OA", Arrays.asList("Destination Transit", "Loaded")),
+
+    DB_I("DB_I", Arrays.asList("Origin Ramp", "Loaded")),
+    DB_RL("DB_RL", Arrays.asList("Rail Transit", "Loaded")),
+
+    DB_X1_LIVE("DB_X1_LIVE", Arrays.asList("Destination Street", "Unloading")),
+    DB_X1_DROP("DB_X1_DROP", Arrays.asList("Destination Street", "Placed for Unloading")),
+
+    DB_CD_LIVE("DB_CD_LIVE", Arrays.asList("Destination Street", "Empty")),
+    DB_CD_DROP("DB_CD_DROP", Arrays.asList("Destination Street", "Placed for Unloading")),
+
+
+
     X_X3("X_X3", Arrays.asList("Destination Ramp", "Loaded")),
     X_AF("X_AF", Arrays.asList("Crosstown Transit", "Loaded")),
     X_X1("X_X1", Arrays.asList("Origin Ramp", "Loaded")),
