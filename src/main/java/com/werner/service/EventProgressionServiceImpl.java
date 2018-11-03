@@ -60,7 +60,7 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                 Transaction transaction = null;
                 Transaction existingTransaction = null;
                 if (onNetworkEvents.contains(request.getEventCode())) {
-                    transaction = prepareTransaction(request, "A");
+                    transaction = prepareTransaction(request);
                     existingTransaction = transaction;
                 }else if (offNetworkEvents.contains(request.getEventCode())){
                     /*
@@ -141,8 +141,15 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
 
                     final Transaction dbTransaction;
+
+                    //TODO --- need to validate H if we get two transactions
+                    // need to check with shipment number and equipment number ...
                     final EquipmentLatestStatus byEquipNumber = equipmentLatestStatusRepository.findByEquipNumber(request.getEquipmentNumber());
-                    final Optional<SegmentOrder> previousSegmentOrder = request.getSegmentOrders().stream().filter(s -> StringUtils.equalsIgnoreCase(s.getSegmentNumber(), byEquipNumber.getSegmentNumber())).findFirst();
+                     Optional<SegmentOrder> previousSegmentOrder = Optional.empty();
+                    if(byEquipNumber != null){
+                        previousSegmentOrder = request.getSegmentOrders().stream().filter(s -> StringUtils.equalsIgnoreCase(s.getSegmentNumber(), byEquipNumber.getSegmentNumber())).findFirst();
+                    }
+
 
                     if (validateERWithDrop(request, byEquipNumber, previousSegmentOrder)){
                         dbTransaction = transactionRepository.findByEquipNumberAndStatus(request.getEquipmentNumber(),"A");
@@ -255,7 +262,7 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                                 transaction = transactionRepository.save(byEquipNumberAndRezTrackingNumberNotNull);
                             }
                         } else {
-                            transaction = prepareTransaction(request, "A");
+                            transaction = prepareTransaction(request);
                             existingTransaction = transaction;
                         }
 
@@ -308,7 +315,7 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
         //step 1 : get the latest equipment status and if the event is onNetwork event save the equipment status
 
-        EquipmentLatestStatus equipmentLatestStatus = null;
+        EquipmentLatestStatus equipmentLatestStatus;
 
         final String[] streetAndEquipStatus = getStreetAndEquipStatus(request);
 
@@ -351,7 +358,7 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
 
                 if ((equipmentLatestStatus != null && onNetworkEvents.contains(equipmentLatestStatus.getEventType())) ||
-                        (equipmentLatestStatus != null && canUpdateEquipLatestStatus(equipmentLatestStatus, request, existingTransaction))) {
+                        (equipmentLatestStatus != null && canUpdateEquipLatestStatus(equipmentLatestStatus, request))) {
 
                     equipmentLatestStatus.setStreetStatus(streetAndEquipStatus[0]);
                     equipmentLatestStatus.setEquipStatus(streetAndEquipStatus[1]);
@@ -377,7 +384,7 @@ public class EventProgressionServiceImpl implements EventProgressionService {
         return equipmentLatestStatus;
     }
 
-    private Boolean canUpdateEquipLatestStatus(EquipmentLatestStatus byEquipNumberLatestStatus, EquipmentEventRequest request, Transaction existingTransaction) {
+    private Boolean canUpdateEquipLatestStatus(EquipmentLatestStatus byEquipNumberLatestStatus, EquipmentEventRequest request) {
 
         /*
 
@@ -620,7 +627,7 @@ public class EventProgressionServiceImpl implements EventProgressionService {
         }
     }
 
-    private Transaction prepareTransaction(EquipmentEventRequest request, String transactionStatus) {
+    private Transaction prepareTransaction(EquipmentEventRequest request) {
 
         final Transaction dbTransactionStatus;
 
@@ -634,41 +641,93 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
         if (dbTransactionStatus == null) {
 
+            final Transaction byEquipNumberAndStatusInAndShipmentNumberNotNull = validateOEWhenInitialTransactionIsNull(request);
 
-/*
-            if (StringUtils.equalsIgnoreCase("MON", request.getEventCode())) {
-                transaction.setStatus("F");
-            }else*/
+            if (byEquipNumberAndStatusInAndShipmentNumberNotNull != null)
+                return byEquipNumberAndStatusInAndShipmentNumberNotNull;
 
-            /*
-                IF OE WITH NEW TRACKING NUM
-                    IF EXISTS
-                        LOG IT AND ELS AS PER BL
-                    IF NOT EXISTS
-                        STEP 1: FIND P/A WITH EQUIPMENT NUMBER ONLY AND SHIPMENT NOT NULL
-                            IF EXISTS
-                                UPDATE TRANSACTION WITH TRACKING NUMBER
-                            IF NOT EXISTS
-                                CREATE A NEW TRANSACTION WITH P STATUS
 
-                                //TODO --- Assuming that older transaction with same equipment will be closed by off network  events
-             */
+            final Transaction byEquipNumberAndRezTrackingNumberNotNull = validateESAWhenInitialTransactionIsNull(request);
 
-            if (StringUtils.equalsIgnoreCase("OE", request.getEventCode())) {
-
-                final List<Transaction> byEquipNumberAndStatusInAndShipmentNumberNotNull = transactionRepository.findByEquipNumberAndStatusInAndShipmentNumberNotNull(request.getEquipmentNumber(), Arrays.asList("A", "P"));
-
-                if (CollectionUtils.isNotEmpty(byEquipNumberAndStatusInAndShipmentNumberNotNull)) {
-
-                    byEquipNumberAndStatusInAndShipmentNumberNotNull.forEach(t -> t.setRezTrackingNumber(request.getTrackingNum()));
-
-                    return transactionRepository.saveAll(byEquipNumberAndStatusInAndShipmentNumberNotNull).iterator().next();
-                }
-
+            if (byEquipNumberAndRezTrackingNumberNotNull != null) {
+                return byEquipNumberAndRezTrackingNumberNotNull;
             }
 
-            /*
+            Transaction transaction = new Transaction();
 
+            transaction.setEquipNumber(request.getEquipmentNumber());
+            transaction.setShipmentNumber(request.getShipmentNumber());
+            transaction.setRezTrackingNumber(request.getTrackingNum());
+            transaction.setProgramName(request.getProgramName());
+            transaction.setCustRefNumber(request.getCustRefNumber());
+            transaction.setStartEventCode(request.getEventCode());
+            transaction.setCurrentEventCode(request.getEventCode());
+            transaction.setStartDate(LocalDateTime.now().toString());
+            transaction.setStatus("A");
+
+            return transactionRepository.save(transaction);
+
+        } else {
+
+            dbTransactionStatus.setEquipNumber(request.getEquipmentNumber());
+
+            if(validateInputRequest(request.getTrackingNum(),dbTransactionStatus.getRezTrackingNumber())){
+                dbTransactionStatus.setRezTrackingNumber(request.getTrackingNum());
+            }
+
+            dbTransactionStatus.setCurrentEventCode(request.getEventCode());
+
+            if(validateInputRequest(request.getShipmentNumber(),dbTransactionStatus.getShipmentNumber())){
+                dbTransactionStatus.setShipmentNumber(request.getShipmentNumber());
+            }
+
+            if(validateInputRequest(request.getSegmentNumber(),dbTransactionStatus.getSegmentNumber())){
+                dbTransactionStatus.setSegmentNumber(request.getSegmentNumber());
+            }
+
+            return transactionRepository.save(dbTransactionStatus);
+        }
+    }
+
+
+    private  Boolean validateInputRequest(String inputRequestValue, String existingValue){
+        return  StringUtils.isNotEmpty(inputRequestValue) && StringUtils.isBlank(existingValue);
+    }
+
+
+    /*
+              IF OE WITH NEW TRACKING NUM
+                  IF EXISTS
+                      LOG IT AND ELS AS PER BL
+                  IF NOT EXISTS
+                      STEP 1: FIND P/A WITH EQUIPMENT NUMBER ONLY AND SHIPMENT NOT NULL
+                          IF EXISTS
+                              UPDATE TRANSACTION WITH TRACKING NUMBER
+                          IF NOT EXISTS
+                              CREATE A NEW TRANSACTION WITH P STATUS
+
+                              //TODO --- Assuming that older transaction with same equipment will be closed by off network  events
+           */
+
+    private Transaction validateOEWhenInitialTransactionIsNull(EquipmentEventRequest request) {
+
+        if (StringUtils.equalsIgnoreCase("OE", request.getEventCode())) {
+
+            final List<Transaction> byEquipNumberAndStatusInAndShipmentNumberNotNull = transactionRepository.findByEquipNumberAndStatusInAndShipmentNumberNotNull(request.getEquipmentNumber(), Arrays.asList("A", "P"));
+
+            if (CollectionUtils.isNotEmpty(byEquipNumberAndStatusInAndShipmentNumberNotNull)) {
+
+                byEquipNumberAndStatusInAndShipmentNumberNotNull.forEach(t -> t.setRezTrackingNumber(request.getTrackingNum()));
+
+                return transactionRepository.saveAll(byEquipNumberAndStatusInAndShipmentNumberNotNull).iterator().next();
+            }
+
+        }
+        return null;
+    }
+
+
+     /*
             IF ESA
                 IF EXISTS
                     LOG IT AND ELS AS PER BL
@@ -685,95 +744,42 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                     STEP 3: CREATE A NEW TRANSACTION WITH P STATUS
              */
 
-            if (StringUtils.equalsIgnoreCase("ESA", request.getEventCode())) {
+    private Transaction validateESAWhenInitialTransactionIsNull(EquipmentEventRequest request) {
 
-                //if ESA received ... get all the Pending transactions on the Shipment ...if any mark then as Cancelled
+        if (StringUtils.equalsIgnoreCase("ESA", request.getEventCode())) {
 
-                final List<Transaction> transactions = transactionRepository.findByShipmentNumberAndStatusAndEquipNumberNotNull(request.getShipmentNumber(), "A");
+            //if ESA received ... get all the Pending transactions on the Shipment ...if any mark then as Cancelled
 
-                if (!CollectionUtils.isEmpty(transactions)) {
+            final List<Transaction> transactions = transactionRepository.findByShipmentNumberAndStatusAndEquipNumberNotNull(request.getShipmentNumber(), "A");
 
-                    transactions.forEach(transaction1 -> transaction1.setStatus("C"));
+            if (!CollectionUtils.isEmpty(transactions)) {
 
-                    transactionRepository.saveAll(transactions);
-                } else {
+                transactions.forEach(transaction1 -> transaction1.setStatus("C"));
 
-                    //TODO - check with Sandeep C
-                    final List<Transaction> byEquipNumberAndRezTrackingNumberNotNull = transactionRepository.findByEquipNumberAndStatusAndRezTrackingNumberNotNull(request.getEquipmentNumber(), "A");
+                transactionRepository.saveAll(transactions);
+            } else {
 
-                    if (CollectionUtils.isNotEmpty(byEquipNumberAndRezTrackingNumberNotNull)) {
-                        byEquipNumberAndRezTrackingNumberNotNull.forEach(t -> {
-                            t.setShipmentNumber(request.getShipmentNumber());
-                            t.setCurrentEventCode(request.getEventCode());
-                        });
+                final List<Transaction> byEquipNumberAndRezTrackingNumberNotNull = transactionRepository.findByEquipNumberAndStatusAndRezTrackingNumberNotNull(request.getEquipmentNumber(), "A");
 
-                        return transactionRepository.saveAll(byEquipNumberAndRezTrackingNumberNotNull).iterator().next();
-                    }
-                }
+                if (CollectionUtils.isNotEmpty(byEquipNumberAndRezTrackingNumberNotNull)) {
+                    byEquipNumberAndRezTrackingNumberNotNull.forEach(t -> {
+                        t.setShipmentNumber(request.getShipmentNumber());
+                        t.setCurrentEventCode(request.getEventCode());
+                    });
 
-                final Transaction byEquipNumberAndStatus = transactionRepository.findByEquipNumberAndStatus(request.getEquipmentNumber(), "A");
-
-                if (byEquipNumberAndStatus != null) {
-                    byEquipNumberAndStatus.setStatus("H");
-
-                    transactionRepository.save(byEquipNumberAndStatus);
+                    return transactionRepository.saveAll(byEquipNumberAndRezTrackingNumberNotNull).iterator().next();
                 }
             }
 
-            /*
-                    Find Active transaction with equipment number
-                    if exists
-                        make the transaction as Historic
-                        create transaction
-                    if not exits
-                        create transaction
-             */
+            final Transaction byEquipNumberAndStatus = transactionRepository.findByEquipNumberAndStatus(request.getEquipmentNumber(), "A");
 
-            /*if(StringUtils.equalsIgnoreCase("IT", request.getEventCode())){
+            if (byEquipNumberAndStatus != null) {
+                byEquipNumberAndStatus.setStatus("H");
 
-                final Transaction byEquipNumberAndStatus = transactionRepository.findByEquipNumberAndStatus(request.getEquipmentNumber(), "A");
-
-                if(byEquipNumberAndStatus != null){
-                    byEquipNumberAndStatus.setStatus("H");
-
-                    transactionRepository.save(byEquipNumberAndStatus);
-                }
-            }*/
-
-            Transaction transaction = new Transaction();
-
-            transaction.setEquipNumber(request.getEquipmentNumber());
-            transaction.setShipmentNumber(request.getShipmentNumber());
-            transaction.setRezTrackingNumber(request.getTrackingNum());
-            transaction.setProgramName(request.getProgramName());
-            transaction.setCustRefNumber(request.getCustRefNumber());
-            transaction.setStartEventCode(request.getEventCode());
-            transaction.setCurrentEventCode(request.getEventCode());
-            transaction.setStartDate(LocalDateTime.now().toString());
-            transaction.setStatus(transactionStatus);
-
-            return transactionRepository.save(transaction);
-
-        } else {
-
-            dbTransactionStatus.setEquipNumber(request.getEquipmentNumber());
-
-            if(StringUtils.isNotEmpty(request.getTrackingNum()) && StringUtils.isBlank(dbTransactionStatus.getRezTrackingNumber())){
-                dbTransactionStatus.setRezTrackingNumber(request.getTrackingNum());
+                transactionRepository.save(byEquipNumberAndStatus);
             }
-
-            dbTransactionStatus.setCurrentEventCode(request.getEventCode());
-
-            if(StringUtils.isNotEmpty(request.getShipmentNumber()) && StringUtils.isBlank(dbTransactionStatus.getShipmentNumber())){
-                dbTransactionStatus.setShipmentNumber(request.getShipmentNumber());
-            }
-
-            if(StringUtils.isNotEmpty(request.getSegmentNumber())&& StringUtils.isBlank(dbTransactionStatus.getSegmentNumber())){
-                dbTransactionStatus.setSegmentNumber(request.getSegmentNumber());
-            }
-
-            return transactionRepository.save(dbTransactionStatus);
         }
+        return null;
     }
 }
 
