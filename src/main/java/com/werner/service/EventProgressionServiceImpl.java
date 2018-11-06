@@ -24,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -37,6 +38,9 @@ public class EventProgressionServiceImpl implements EventProgressionService {
     private List<String> onNetworkEvents = Arrays.asList("OE", "IT", "ESA", "MON", "RC");
 
     private List<String> offNetworkEvents = Arrays.asList("IF", "IE", "ID", "MOFN", "SOFN");
+
+    private List<String> cancellationEvents = Arrays.asList("RE", "RX", "TC", "FC");
+
 
     @Autowired
     TransactionRepository transactionRepository;
@@ -62,7 +66,7 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                 if (onNetworkEvents.contains(request.getEventCode())) {
                     transaction = prepareTransaction(request);
                     existingTransaction = transaction;
-                }else if (offNetworkEvents.contains(request.getEventCode())){
+                } else if (offNetworkEvents.contains(request.getEventCode())) {
                     /*
                     FIND TRANSACTIONS BY TRACKING NUMBER
                     IF EXISTS
@@ -78,18 +82,18 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
                     final Transaction byRezTrackingNumber = transactionRepository.findByRezTrackingNumber(request.getTrackingNum());
 
-                    if(byRezTrackingNumber != null){
+                    if (byRezTrackingNumber != null) {
 
-                         byRezTrackingNumber.setStatus("H");
-                         byRezTrackingNumber.setEndDate(LocalDateTime.now().toString());
-                         byRezTrackingNumber.setEndEventCode(request.getEventCode());
+                        byRezTrackingNumber.setStatus("H");
+                        byRezTrackingNumber.setEndDate(LocalDateTime.now().toString());
+                        byRezTrackingNumber.setEndEventCode(request.getEventCode());
 
-                         transaction = transactionRepository.save(byRezTrackingNumber);
-                         existingTransaction = transaction;
-                    }else {
+                        transaction = transactionRepository.save(byRezTrackingNumber);
+                        existingTransaction = transaction;
+                    } else {
                         final Transaction activeTransByEquipAndShipment = transactionRepository.findByEquipNumberAndShipmentNumberAndStatus(request.getEquipmentNumber(), request.getShipmentNumber(), "A");
 
-                        if(activeTransByEquipAndShipment != null){
+                        if (activeTransByEquipAndShipment != null) {
                             activeTransByEquipAndShipment.setStatus("H");
                             activeTransByEquipAndShipment.setEndDate(LocalDateTime.now().toString());
                             activeTransByEquipAndShipment.setEndEventCode(request.getEventCode());
@@ -99,62 +103,67 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                         }
                     }
 
+                } else if (cancellationEvents.contains(request.getEventCode())) {
+
+                    processCancellationEvents(request);
+
                 } else {
+
                     /*
                     CHECK FOR SHIPMENT NUMBER IN REQUEST
                         IF NOT EXISTS
                             GET SHIPMENT NUMBER BY BOL NO IN REZ1 REQUEST
                      */
                     /* FIND BY EQUIP NUMBER AND SHIPMENT NUMBER
-                    *   IF EXISTS
-                    *       STEP 1:
-                    *           IF PENDING
-                    *               STEP 1: FIND ALL ACTIVE TRANSACTIONS WITH EQUIPMENT NUMBER AND SHIPMENT NUMBER NOT NULL
-                    *                   IF EXISTS
-                    *                       MAKE THEM HISTORIC
-                    *               STEP 2: FIND ALL PENDING TRANSACTIONS WITH EQUIPMENT NUMBER
-                    *                           IF EXISTS
-                    *                               MERGE ALL TRANSACTIONS AND DELETE ONE OF THE PENDING TRANSACTION
-                    *               STEP 3: MARK TRANSACTION AS ACTIVE
-                    *           IF ACTIVE
-                    *              LOG EVENT
-                    *              BUSINESS LOGIC TO SET ELS
-                    *           IF HISTORIC
-                    *               LOG EVENT
-                    *   IF NOT EXISTS
-                    *               STEP 1: FIND TRANSACTION BY EQUIPMENT NUMBER AND TRACKING NUM NOT NULL
-                    *                   IF EXISTS
-                    *                       IF PENDING
-                    *                           STEP 1: UPDATE TRACKING NUMBER OR ANY FURTHER INFORAMATION ON TRANSACTION
-                    *                           STEP 2: LOG EVENT
-                    *                           STEP 3: BUSINESS LOGIC TO SET ELS
-                    *                       IF ACTIVE
-                    *                           STEP 2: LOG EVENT
-                    *                           STEP 3: BUSINESS LOGIC TO SET ELS
-                    *                       IF HISTORIC
-                    *                           STEP 3: BUSINESS LOGIC TO SET ELS
-                    *                   IF NOT EXISTS
-                    *                       CREATE A NEW TRANSACTION WITH RESPECTIVE EVENT AND ACTIVE
-                    *                       LOG EVENT
-                    *                       BUSINESS LOGIC TO SET ELS
-                    */
+                     *   IF EXISTS
+                     *       STEP 1:
+                     *           IF PENDING
+                     *               STEP 1: FIND ALL ACTIVE TRANSACTIONS WITH EQUIPMENT NUMBER AND SHIPMENT NUMBER NOT NULL
+                     *                   IF EXISTS
+                     *                       MAKE THEM HISTORIC
+                     *               STEP 2: FIND ALL PENDING TRANSACTIONS WITH EQUIPMENT NUMBER
+                     *                           IF EXISTS
+                     *                               MERGE ALL TRANSACTIONS AND DELETE ONE OF THE PENDING TRANSACTION
+                     *               STEP 3: MARK TRANSACTION AS ACTIVE
+                     *           IF ACTIVE
+                     *              LOG EVENT
+                     *              BUSINESS LOGIC TO SET ELS
+                     *           IF HISTORIC
+                     *               LOG EVENT
+                     *   IF NOT EXISTS
+                     *               STEP 1: FIND TRANSACTION BY EQUIPMENT NUMBER AND TRACKING NUM NOT NULL
+                     *                   IF EXISTS
+                     *                       IF PENDING
+                     *                           STEP 1: UPDATE TRACKING NUMBER OR ANY FURTHER INFORAMATION ON TRANSACTION
+                     *                           STEP 2: LOG EVENT
+                     *                           STEP 3: BUSINESS LOGIC TO SET ELS
+                     *                       IF ACTIVE
+                     *                           STEP 2: LOG EVENT
+                     *                           STEP 3: BUSINESS LOGIC TO SET ELS
+                     *                       IF HISTORIC
+                     *                           STEP 3: BUSINESS LOGIC TO SET ELS
+                     *                   IF NOT EXISTS
+                     *                       CREATE A NEW TRANSACTION WITH RESPECTIVE EVENT AND ACTIVE
+                     *                       LOG EVENT
+                     *                       BUSINESS LOGIC TO SET ELS
+                     */
 
 
                     final Transaction dbTransaction;
 
                     //TODO --- need to validate H if we get two transactions
                     // need to check with shipment number and equipment number ...
-                    final EquipmentLatestStatus byEquipNumber = equipmentLatestStatusRepository.findByEquipNumber(request.getEquipmentNumber());
-                     Optional<SegmentOrder> previousSegmentOrder = Optional.empty();
-                    if(byEquipNumber != null){
-                        previousSegmentOrder = request.getSegmentOrders().stream().filter(s -> StringUtils.equalsIgnoreCase(s.getSegmentNumber(), byEquipNumber.getSegmentNumber())).findFirst();
-                    }
+//                    final EquipmentLatestStatus byEquipNumber = equipmentLatestStatusRepository.findByEquipNumber(request.getEquipmentNumber());
+//                     Optional<SegmentOrder> previousSegmentOrder = Optional.empty();
+//                    if(byEquipNumber != null){
+//                        previousSegmentOrder = request.getSegmentOrders().stream().filter(s -> StringUtils.equalsIgnoreCase(s.getSegmentNumber(), byEquipNumber.getSegmentNumber())).findFirst();
+//                    }
 
 
-                    if (validateERWithDrop(request, byEquipNumber, previousSegmentOrder)){
-                        dbTransaction = transactionRepository.findByEquipNumberAndStatus(request.getEquipmentNumber(),"A");
-                    }else{
-                         dbTransaction = transactionRepository.findByEquipNumberAndShipmentNumber(request.getEquipmentNumber(), request.getShipmentNumber());
+                    if ((request.getSegmentType() != null && request.getSegmentType().equalsIgnoreCase("ER")) && validateERWithDrop(request)) {
+                        dbTransaction = transactionRepository.findByEquipNumberAndStatus(request.getEquipmentNumber(), "A");
+                    } else {
+                        dbTransaction = transactionRepository.findByEquipNumberAndShipmentNumber(request.getEquipmentNumber(), request.getShipmentNumber());
                     }
 
 
@@ -221,15 +230,15 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
                             BeanUtils.copyProperties(dbTransaction, existingTransaction);
 
-                            if(StringUtils.isNotEmpty(request.getShipmentNumber()) && StringUtils.isBlank(dbTransaction.getShipmentNumber())){
+                            if (StringUtils.isNotEmpty(request.getShipmentNumber()) && StringUtils.isBlank(dbTransaction.getShipmentNumber())) {
                                 dbTransaction.setShipmentNumber(request.getShipmentNumber());
                             }
 
-                            if( validateERWithDrop(request, byEquipNumber, previousSegmentOrder) || StringUtils.isNotEmpty(request.getSegmentNumber()) && StringUtils.isBlank(dbTransaction.getSegmentNumber())){
+                            if ((request.getSegmentType() != null && request.getSegmentType().equalsIgnoreCase("ER")) && validateERWithDrop(request) || StringUtils.isNotEmpty(request.getSegmentNumber()) && StringUtils.isBlank(dbTransaction.getSegmentNumber())) {
                                 dbTransaction.setSegmentNumber(request.getSegmentNumber());
                             }
-                                dbTransaction.setCurrentEventCode(request.getEventCode());
-                            if(StringUtils.isNotEmpty(request.getEquipmentNumber()) && StringUtils.isBlank(dbTransaction.getEquipNumber())){
+                            dbTransaction.setCurrentEventCode(request.getEventCode());
+                            if (StringUtils.isNotEmpty(request.getEquipmentNumber()) && StringUtils.isBlank(dbTransaction.getEquipNumber())) {
                                 dbTransaction.setEquipNumber(request.getEquipmentNumber());
                             }
 
@@ -239,7 +248,7 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                         }
 
                     } else {
-                        final Transaction byEquipNumberAndRezTrackingNumberNotNull = transactionRepository.findByEquipNumberAndRezTrackingNumberNotNull(request.getEquipmentNumber());
+                        final Transaction byEquipNumberAndRezTrackingNumberNotNull = transactionRepository.findByEquipNumberAndStatusAndRezTrackingNumberNotNull(request.getEquipmentNumber(), "A");
 
                         if (byEquipNumberAndRezTrackingNumberNotNull != null) {
                             if (StringUtils.equalsIgnoreCase(byEquipNumberAndRezTrackingNumberNotNull.getStatus(), "P") ||
@@ -249,13 +258,13 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
                                 BeanUtils.copyProperties(byEquipNumberAndRezTrackingNumberNotNull, existingTransaction);
 
-                                if (!request.getSegmentType().equalsIgnoreCase("ER")){
+                                if (!request.getSegmentType().equalsIgnoreCase("ER")) {
                                     byEquipNumberAndRezTrackingNumberNotNull.setShipmentNumber(request.getShipmentNumber());
                                     byEquipNumberAndRezTrackingNumberNotNull.setSegmentNumber(request.getSegmentNumber());
                                 }
                                 byEquipNumberAndRezTrackingNumberNotNull.setCurrentEventCode(request.getEventCode());
                                 byEquipNumberAndRezTrackingNumberNotNull.setEquipNumber(request.getEquipmentNumber());
-                                if (StringUtils.equalsIgnoreCase(byEquipNumberAndRezTrackingNumberNotNull.getStatus(), "P")){
+                                if (StringUtils.equalsIgnoreCase(byEquipNumberAndRezTrackingNumberNotNull.getStatus(), "P")) {
                                     byEquipNumberAndRezTrackingNumberNotNull.setStatus("A");
                                 }
 
@@ -270,11 +279,15 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                 }
 
                 // Save into Status History log with all the request values
-                prepareStatusHistoryLog(transaction, request);
+                StatusHistoryLog statusHistoryLog = prepareStatusHistoryLog(transaction, request);
 
                 // Step - 3 validate business rules and save into equipment latest status
+                EquipmentLatestStatus equipmentLatestStatus = new EquipmentLatestStatus();
 
-                final EquipmentLatestStatus equipmentLatestStatus = prepareEquipmentLatestStatus(request, existingTransaction, transaction);
+                if(StringUtils.equalsIgnoreCase("A",transaction.getStatus())){
+                    equipmentLatestStatus = prepareEquipmentLatestStatus(request, existingTransaction, transaction,statusHistoryLog);
+                }
+
 
                 prepareResponse(response, equipmentLatestStatus);
 
@@ -282,7 +295,7 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
 
         } catch (Exception ex) {
-            response.setErrorMessage("Exception while processing event");
+            response.setErrorMessage("Exception while processing event, " + ex.getMessage());
             LOGGER.error("Exception ::, ", ex);
             return response;
         }
@@ -290,9 +303,81 @@ public class EventProgressionServiceImpl implements EventProgressionService {
         return response;
     }
 
-    private boolean validateERWithDrop(EquipmentEventRequest request, EquipmentLatestStatus byEquipNumber, Optional<SegmentOrder> previousSegmentOrder) {
+    private void processCancellationEvents(EquipmentEventRequest request) {
+
+        final Transaction transaction;
+
+        if (Arrays.asList("RX", "RE").contains(request.getEventCode())) {
+            transaction = transactionRepository.findByRezTrackingNumber(request.getTrackingNum());
+
+            updateTransactionWithStatus(request, transaction, "C");
+        } else if (StringUtils.equalsIgnoreCase("TC", request.getEventCode())) {
+
+            transaction = transactionRepository.findByEquipNumberAndRezTrackingNumber(request.getEquipmentNumber(), request.getTrackingNum());
+
+            updateTransactionWithStatus(request, transaction, "C");
+        } else if (StringUtils.equalsIgnoreCase("FC", request.getEventCode())) {
+
+            transaction = transactionRepository.findByEquipNumberAndRezTrackingNumber(request.getEquipmentNumber(), request.getTrackingNum());
+
+            /*step 1 change H to A
+
+            remove end date and end event
+
+            update ELS with SHL (find the status history log with segmentOrderDesc,segmentEventOrder desc)
+
+            updateTransactionWithStatus(EquipmentEventRequest request, Transaction transaction,String status)
+
+        */
+
+            updateTransactionWithStatus(request, transaction, "A");
+
+
+            StatusHistoryLog statusHistoryLog = statusHistoryLogRepository.findTopByTransactionAndSegmentPriorityNotNullOrderBySegmentPriorityDescSegmentEventPriorityDesc(transaction);
+
+            EquipmentLatestStatus equipmentLatestStatus = equipmentLatestStatusRepository.findByEquipNumber(request.getEquipmentNumber());
+
+            if (equipmentLatestStatus != null && statusHistoryLog != null) {
+                equipmentLatestStatus.setStreetStatus(statusHistoryLog.getStreetStatus());
+                equipmentLatestStatus.setEquipStatus(statusHistoryLog.getEquipStatus());
+                equipmentLatestStatus.setEventType(statusHistoryLog.getEventType());
+
+                equipmentLatestStatusRepository.save(equipmentLatestStatus);
+
+            }
+
+
+        }
+    }
+
+    private void updateTransactionWithStatus(EquipmentEventRequest request, Transaction transaction, String status) {
+
+        if (transaction != null) {
+
+            transaction.setStatus(status);
+            transaction.setEndDate(LocalDateTime.now().toString());
+            transaction.setEndEventCode(request.getEventCode());
+
+            if (StringUtils.equalsIgnoreCase("FC", request.getEventCode())) {
+                transaction.setEndEventCode(null);
+                transaction.setEndDate(null);
+            }
+
+            transactionRepository.save(transaction);
+        }
+    }
+
+    private boolean validateERWithDrop(EquipmentEventRequest request) {
+
+        final EquipmentLatestStatus byEquipNumber = equipmentLatestStatusRepository.findByEquipNumber(request.getEquipmentNumber());
+        Optional<SegmentOrder> previousSegmentOrder = Optional.empty();
+        if (byEquipNumber != null) {
+            previousSegmentOrder = request.getSegmentOrders().stream().filter(s -> StringUtils.equalsIgnoreCase(s.getSegmentNumber(), byEquipNumber.getSegmentNumber())).findFirst();
+        }
+
+
         return request.getSegmentType() != null && request.getSegmentType().equalsIgnoreCase("ER") && byEquipNumber != null &&
-                ( StringUtils.equalsIgnoreCase(byEquipNumber.getLoadOption(),"Drop") || ( previousSegmentOrder.isPresent()  && StringUtils.equalsIgnoreCase(previousSegmentOrder.get().getSegmentType(), "ER")));
+                (StringUtils.equalsIgnoreCase(byEquipNumber.getLoadOption(), "Drop") || (previousSegmentOrder.isPresent() && StringUtils.equalsIgnoreCase(previousSegmentOrder.get().getSegmentType(), "ER")));
     }
 
     @Override
@@ -311,61 +396,67 @@ public class EventProgressionServiceImpl implements EventProgressionService {
     }
 
 
-    private EquipmentLatestStatus prepareEquipmentLatestStatus(EquipmentEventRequest request, Transaction existingTransaction, Transaction newTransaction) {
+    private EquipmentLatestStatus prepareEquipmentLatestStatus(EquipmentEventRequest request, Transaction existingTransaction, Transaction newTransaction, StatusHistoryLog statusHistoryLog) {
 
         //step 1 : get the latest equipment status and if the event is onNetwork event save the equipment status
 
         EquipmentLatestStatus equipmentLatestStatus;
 
-        final String[] streetAndEquipStatus = getStreetAndEquipStatus(request);
+        final String[] streetAndEquipStatus = StringUtils.isNotBlank(request.getEquipmentNumber()) ? getStreetAndEquipStatus(request) : null;
 
-            if (streetAndEquipStatus != null) {
+        if (streetAndEquipStatus != null) {
 
             if (onNetworkEvents.contains(request.getEventCode())) {
 
-                equipmentLatestStatus = equipmentLatestStatusRepository.findByTransaction(existingTransaction);
+                equipmentLatestStatus = equipmentLatestStatusRepository.findByEquipNumber(request.getEquipmentNumber());
 
                 if (equipmentLatestStatus == null) {
                     return prepareEquipmentLatestStatusObject(newTransaction, request, streetAndEquipStatus[0], streetAndEquipStatus[1]);
-                } else if (equipmentLatestStatus.getLoadOption() == null ) {
+                } else if (request.getLoadOption() == null) {
 
                     equipmentLatestStatus.setStreetStatus(streetAndEquipStatus[0]);
                     equipmentLatestStatus.setEquipStatus(streetAndEquipStatus[1]);
                     equipmentLatestStatus.setEquipNumber(request.getEquipmentNumber());
                     equipmentLatestStatus.setEventType(request.getEventCode());
-                    equipmentLatestStatus.setTransaction(newTransaction);
+//                    equipmentLatestStatus.setTransaction(newTransaction);
                     equipmentLatestStatus.setLoadOption(request.getLoadOption());
+
 
                     return equipmentLatestStatusRepository.save(equipmentLatestStatus);
                 }
 
             } else if (offNetworkEvents.contains(request.getEventCode()) && existingTransaction != null) {
 
-                equipmentLatestStatus = equipmentLatestStatusRepository.findByTransaction(existingTransaction);
+                equipmentLatestStatus = equipmentLatestStatusRepository.findByEquipNumber(request.getEquipmentNumber());
 
-                if(equipmentLatestStatus != null){
+                if (equipmentLatestStatus != null) {
                     equipmentLatestStatus.setStreetStatus("OFNET");
                     equipmentLatestStatus.setEquipStatus("EMPTY");
                     equipmentLatestStatus.setEventType(request.getEventCode());
 
+
                     return equipmentLatestStatusRepository.save(equipmentLatestStatus);
                 }
 
-            }else {
+            } else if (cancellationEvents.contains(request.getEventCode())) {
+                return new EquipmentLatestStatus();
+            } else {
                 //find the equip latest status with the equipment number from the request
 
                 equipmentLatestStatus = equipmentLatestStatusRepository.findByEquipNumber(request.getEquipmentNumber());
 
+                //equipmentLatestStatus = equipmentLatestStatusRepository.findByTransaction(existingTransaction);
+
 
                 if ((equipmentLatestStatus != null && onNetworkEvents.contains(equipmentLatestStatus.getEventType())) ||
-                        (equipmentLatestStatus != null && canUpdateEquipLatestStatus(equipmentLatestStatus, request))) {
+                        (equipmentLatestStatus != null && canUpdateEquipLatestStatus(equipmentLatestStatus, request,statusHistoryLog))) {
 
                     equipmentLatestStatus.setStreetStatus(streetAndEquipStatus[0]);
                     equipmentLatestStatus.setEquipStatus(streetAndEquipStatus[1]);
                     equipmentLatestStatus.setEventType(request.getEventCode());
                     equipmentLatestStatus.setEventDate(request.getEventDate());
                     equipmentLatestStatus.setSegmentNumber(request.getSegmentNumber());
-                    equipmentLatestStatus.setTransaction(newTransaction);
+//                    equipmentLatestStatus.setTransaction(newTransaction);
                     equipmentLatestStatus.setLoadOption(request.getLoadOption());
 
 
@@ -384,7 +475,85 @@ public class EventProgressionServiceImpl implements EventProgressionService {
         return equipmentLatestStatus;
     }
 
-    private Boolean canUpdateEquipLatestStatus(EquipmentLatestStatus byEquipNumberLatestStatus, EquipmentEventRequest request) {
+
+    private Integer getSegmentOrder(EquipmentEventRequest request) {
+
+        // TODO --- Find active shipment for the equipment and get all the segment details
+
+        if (request.getSegmentNumber() != null) {
+            if (StringUtils.equalsIgnoreCase("UICD", request.getEventCode())) {
+                if (StringUtils.containsIgnoreCase(request.getStreetStatusDesc(), "Destination")) {
+                    return request.getSegmentOrders().stream().filter(s -> StringUtils.equalsIgnoreCase(s.getSegmentType(), "D")).findFirst().get().getPriorityOrder();
+                } else if (StringUtils.containsIgnoreCase(request.getStreetStatusDesc(),"Origin")) {
+                    return request.getSegmentOrders().stream().filter(s -> StringUtils.equalsIgnoreCase(s.getSegmentType(), "O")).findFirst().get().getPriorityOrder();
+                }
+            }
+            if (request.getSegmentOrders().stream().anyMatch(s -> StringUtils.equalsIgnoreCase(s.getSegmentNumber(), request.getSegmentNumber()))) {
+                return request.getSegmentOrders().stream().filter(s -> StringUtils.equalsIgnoreCase(s.getSegmentNumber(), request.getSegmentNumber())).findFirst().get().getPriorityOrder();
+            }
+        }
+        return null;
+    }
+
+
+    private Integer getSegmentEventOrder(EquipmentEventRequest request) {
+
+        // TODO --- Find active shipment for the equipment and get all the segment details and active segment
+
+        String loadOption = StringUtils.isNotBlank(request.getLoadOption()) ? request.getLoadOption() : "Live";
+
+        List<String> keys = EventCodeMappingEnum.getKeyUsingValue(Arrays.asList(request.getStreetStatusDesc(), request.getEquipStatusDesc()));
+        if (request.getSegmentNumber() != null) {
+            if (StringUtils.equalsIgnoreCase("UICD", request.getEventCode())) {
+                if (StringUtils.containsIgnoreCase(request.getStreetStatusDesc(),"Destination")) {
+                    List<String> d = keys.stream().filter(p -> StringUtils.startsWithIgnoreCase(p, "D_") && StringUtils.endsWithIgnoreCase(p, loadOption)).collect(Collectors.toList());
+                    //D_X1_DROP 3
+                    //D_CD_DROP 4
+                    request.setSegmentType("D");
+                    List<Integer> integers = new ArrayList<>();
+                    d.forEach(d1 -> {
+                        String[] s = d1.split("_");
+                        integers.add(DraySegmentEventPriority.getDraySegmentEventPriority(s[1]));
+                    });
+                    return integers.stream().mapToInt(Integer::intValue).max().isPresent() ? integers.stream().mapToInt(Integer::intValue).max().getAsInt() : null;
+                } else if (StringUtils.containsIgnoreCase(request.getStreetStatusDesc(),"Origin")) {
+                    List<String> d = keys.stream().filter(p -> StringUtils.startsWithIgnoreCase(p, "O_") && StringUtils.endsWithIgnoreCase(p, loadOption)).collect(Collectors.toList());
+                    //D_X1_DROP 3
+                    //D_CD_DROP 4
+                    request.setSegmentType("O");
+                    List<Integer> integers = new ArrayList<>();
+                    d.forEach(d1 -> {
+                        String[] s = d1.split("_");
+                        integers.add(DraySegmentEventPriority.getDraySegmentEventPriority(s[1]));
+                    });
+                    return integers.stream().mapToInt(Integer::intValue).max().isPresent() ? integers.stream().mapToInt(Integer::intValue).max().getAsInt() : null;
+                }
+            } else {
+                switch (request.getSegmentType()) {
+
+                    case "O":
+                    case "D":
+                    case "X":
+                        return DraySegmentEventPriority.getDraySegmentEventPriority(request.getEventCode());
+                    case "R":
+                    case "ER":
+                        return RailSegmentEventPriority.getRailSegmentEventPriority(request.getEventCode());
+                    case "DB":
+                        return DestinationBundledSegmentEventPriority.getDestinationBundledSegmentEventPriority(request.getEventCode());
+                    case "OB":
+                        return OriginBundledSegmentEventPriority.getOriginBundledSegmentEventPriority(request.getEventCode());
+                    case "B":
+                        return BundledSegmentEventPriority.getBundledSegmentEventPriority(request.getEventCode());
+                    default:
+                        return null;
+
+                }
+            }
+        }
+        return null;
+    }
+
+    private Boolean canUpdateEquipLatestStatus(EquipmentLatestStatus byEquipNumberLatestStatus, EquipmentEventRequest request, StatusHistoryLog statusHistoryLog) {
 
         /*
 
@@ -394,8 +563,8 @@ public class EventProgressionServiceImpl implements EventProgressionService {
          */
 
         // TODO --- need to save segment priority
-   /*     if (StringUtils.isNotBlank(request.getSegmentType()) && request.getSegmentType().equalsIgnoreCase("ER")){
-            *//*
+        /*     if (StringUtils.isNotBlank(request.getSegmentType()) && request.getSegmentType().equalsIgnoreCase("ER")){
+         *//*
             Step 1: Get ELS based on Equipment number
             Step 2: Get the previous segment order based on the segment number from step 1
              *//*
@@ -410,17 +579,19 @@ public class EventProgressionServiceImpl implements EventProgressionService {
         final Optional<SegmentOrder> requestedSegmentOrder = request.getSegmentOrders().stream().filter(s -> StringUtils.equalsIgnoreCase(s.getSegmentNumber(), request.getSegmentNumber())).findFirst();
 
         /*if(request.getSegmentType() != null &&  request.getSegmentType().equalsIgnoreCase("ER") && byEquipNumberLatestStatus.getLoadOption().equalsIgnoreCase("DROP")){
-            Integer exisitngRailEventCode = RailSegmentEventPriority.getRailSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
-            return RailSegmentEventPriority.getRailSegmentEventPriority(request.getEventCode()) >  (exisitngRailEventCode != null ? exisitngRailEventCode : 0);
+            Integer existingRailEventCode = RailSegmentEventPriority.getRailSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
+            return RailSegmentEventPriority.getRailSegmentEventPriority(request.getEventCode()) >  (existingRailEventCode != null ? existingRailEventCode : 0);
         }*/
-        if (request.getSegmentType() != null && request.getSegmentType().equalsIgnoreCase("ER")) {
+
+        if (request.getSegmentType() != null && request.getSegmentType().equalsIgnoreCase("ER") && byEquipNumberLatestStatus != null && StringUtils.equalsIgnoreCase("DROP",byEquipNumberLatestStatus.getLoadOption())) {
             if (previousSegmentOrder.isPresent()) {
-                if (StringUtils.equalsIgnoreCase(previousSegmentOrder.get().getSegmentType(), "ER")) {
                     return RailSegmentEventPriority.getRailSegmentEventPriority(request.getEventCode()) > RailSegmentEventPriority.getRailSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
-                } else if (byEquipNumberLatestStatus.getLoadOption().equalsIgnoreCase("DROP")) {
-                    Integer exisitngRailEventCode = RailSegmentEventPriority.getRailSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
-                    return RailSegmentEventPriority.getRailSegmentEventPriority(request.getEventCode()) > (exisitngRailEventCode != null ? exisitngRailEventCode : 0);
-                }
+//                } else if (byEquipNumberLatestStatus.getLoadOption().equalsIgnoreCase("DROP")) {
+//                    Integer existingRailEventCode = RailSegmentEventPriority.getRailSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
+//                    return RailSegmentEventPriority.getRailSegmentEventPriority(request.getEventCode()) > (existingRailEventCode != null ? existingRailEventCode : 0);
+//                }
+            }else {
+                return Boolean.TRUE;
             }
 
         } else {
@@ -435,18 +606,42 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                     return Boolean.TRUE;
                 } else if (previousSegmentOrder.get().getPriorityOrder().equals(requestedSegmentOrder.get().getPriorityOrder())) {
 
+                        if (RailSegmentEventPriority.getRailSegmentEventPriority(request.getEventCode()) != null
+                                && Arrays.asList("R", "ER").contains(requestedSegmentOrder.get().getSegmentType()) &&
+                                    RailSegmentEventPriority.getRailSegmentEventPriority(byEquipNumberLatestStatus.getEventType()) != null) {
+                            return RailSegmentEventPriority.getRailSegmentEventPriority(request.getEventCode()) > RailSegmentEventPriority.getRailSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
+                        } else if (DraySegmentEventPriority.getDraySegmentEventPriority(request.getEventCode()) != null && Arrays.asList("O", "D", "X").contains(requestedSegmentOrder.get().getSegmentType())) {
+                            return DraySegmentEventPriority.getDraySegmentEventPriority(request.getEventCode()) > DraySegmentEventPriority.getDraySegmentEventPriority(byEquipNumberLatestStatus.getEventType());
+                        } else if (BundledSegmentEventPriority.getBundledSegmentEventPriority(request.getEventCode()) != null && Arrays.asList("B").contains(requestedSegmentOrder.get().getSegmentType())) {
+                            return BundledSegmentEventPriority.getBundledSegmentEventPriority(request.getEventCode()) > BundledSegmentEventPriority.getBundledSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
+                        } else if (OriginBundledSegmentEventPriority.getOriginBundledSegmentEventPriority(request.getEventCode()) != null && Arrays.asList("OB").contains(requestedSegmentOrder.get().getSegmentType())) {
+                            return OriginBundledSegmentEventPriority.getOriginBundledSegmentEventPriority(request.getEventCode()) > OriginBundledSegmentEventPriority.getOriginBundledSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
+                        } else if (DestinationBundledSegmentEventPriority.getDestinationBundledSegmentEventPriority(request.getEventCode()) != null && Arrays.asList("DB").contains(requestedSegmentOrder.get().getSegmentType())) {
+                            return DestinationBundledSegmentEventPriority.getDestinationBundledSegmentEventPriority(request.getEventCode()) > DestinationBundledSegmentEventPriority.getDestinationBundledSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
+                        } else if(StringUtils.equalsIgnoreCase("UICD", request.getEventCode())){
+                            if(StringUtils.equalsIgnoreCase("D", request.getSegmentType())){
+                                Integer segmentEventPriority = DraySegmentEventPriority.getDraySegmentEventPriority(byEquipNumberLatestStatus.getEventType());
 
-                    if (RailSegmentEventPriority.getRailSegmentEventPriority(request.getEventCode()) != null && Arrays.asList("R", "ER").contains(requestedSegmentOrder.get().getSegmentType())) {
-                        return RailSegmentEventPriority.getRailSegmentEventPriority(request.getEventCode()) > RailSegmentEventPriority.getRailSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
-                    } else if (DraySegmentEventPriority.getDraySegmentEventPriority(request.getEventCode()) != null && Arrays.asList("O", "D", "X").contains(requestedSegmentOrder.get().getSegmentType())) {
-                        return DraySegmentEventPriority.getDraySegmentEventPriority(request.getEventCode()) > DraySegmentEventPriority.getDraySegmentEventPriority(byEquipNumberLatestStatus.getEventType());
-                    } else if(BundledSegmentEventPriority.getBundledSegmentEventPriority(request.getEventCode()) != null && Arrays.asList("B").contains(requestedSegmentOrder.get().getSegmentType())){
-                        return BundledSegmentEventPriority.getBundledSegmentEventPriority(request.getEventCode()) > BundledSegmentEventPriority.getBundledSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
-                    } else if(OriginBundledSegmentEventPriority.getOriginBundledSegmentEventPriority(request.getEventCode()) != null && Arrays.asList("OB").contains(requestedSegmentOrder.get().getSegmentType())){
-                        return OriginBundledSegmentEventPriority.getOriginBundledSegmentEventPriority(request.getEventCode()) > OriginBundledSegmentEventPriority.getOriginBundledSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
-                    } else if(DestinationBundledSegmentEventPriority.getDestinationBundledSegmentEventPriority(request.getEventCode()) != null && Arrays.asList("DB").contains(requestedSegmentOrder.get().getSegmentType())){
-                        return DestinationBundledSegmentEventPriority.getDestinationBundledSegmentEventPriority(request.getEventCode()) > DestinationBundledSegmentEventPriority.getDestinationBundledSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
-                    }
+                                if(segmentEventPriority == null){
+                                    segmentEventPriority = findSegmentEventPriorityUsingStreetAndEquipStatus(request,byEquipNumberLatestStatus.getStreetStatus(),byEquipNumberLatestStatus.getEquipStatus(),"D_");
+                                }
+
+                                return statusHistoryLog.getSegmentEventPriority() > segmentEventPriority ;
+                            }else if (StringUtils.equalsIgnoreCase("O", request.getSegmentType())){
+
+                                Integer segmentEventPriority = DraySegmentEventPriority.getDraySegmentEventPriority(byEquipNumberLatestStatus.getEventType());
+
+                                if(segmentEventPriority == null){
+                                    segmentEventPriority = findSegmentEventPriorityUsingStreetAndEquipStatus(request,byEquipNumberLatestStatus.getStreetStatus(),byEquipNumberLatestStatus.getEquipStatus(),"O_");
+                                }
+
+                                return statusHistoryLog.getSegmentEventPriority() > segmentEventPriority;
+                            }
+                        }
+
+
+
+
                 /*if (SegmentEventPriority.getSegmentPriority(byEquipNumberLatestStatus.getEventType()) != null &&
                         SegmentEventPriority.getSegmentPriority(request.getEventCode()) != null &&
 //                        SegmentEventPriority.getSegmentPriority(request.getEventCode()).compareTo(SegmentEventPriority.getSegmentPriority(byEquipNumberLatestStatus.getEventType())) >= 1 )
@@ -462,17 +657,34 @@ public class EventProgressionServiceImpl implements EventProgressionService {
     }
 
 
+    private Integer findSegmentEventPriorityUsingStreetAndEquipStatus(EquipmentEventRequest request,String streetStatus, String equipStatus,String segmentType){
+
+        String loadOption  = StringUtils.isNotBlank(request.getEventCode()) ? request.getEventCode() : "Live";
+
+        List<String> keys = EventCodeMappingEnum.getKeyUsingValue(Arrays.asList(streetStatus, equipStatus));
+
+        List<String> d = keys.stream().filter(p -> StringUtils.startsWithIgnoreCase(p, segmentType) && StringUtils.endsWithIgnoreCase(p, loadOption)).collect(Collectors.toList());
+        //D_X1_DROP 3
+        //D_CD_DROP 4
+        List<Integer> integers = new ArrayList<>();
+        d.forEach(d1 -> {
+            String[] s = d1.split("_");
+            integers.add(DraySegmentEventPriority.getDraySegmentEventPriority(s[1]));
+        });
+        return integers.stream().mapToInt(Integer::intValue).max().isPresent() ? integers.stream().mapToInt(Integer::intValue).max().getAsInt() : null;
+    }
+
     /*
             if we get X3 check if the current event is OA from the last segment then don't update the Equipment Latest Status --- done
      */
     private Boolean validateExceptionCaseForX3(SegmentOrder previousSegmentOrder, SegmentOrder requestedSegmentOrder, EquipmentLatestStatus byEquipNumberLatestStatus) {
 
-        if(requestedSegmentOrder.getPriorityOrder() -1 == 0 ){
-           return  requestedSegmentOrder.getPriorityOrder() > previousSegmentOrder.getPriorityOrder() ;
+        if (requestedSegmentOrder.getPriorityOrder() - 1 == 0) {
+            return requestedSegmentOrder.getPriorityOrder() > previousSegmentOrder.getPriorityOrder();
 
-        }else  if (previousSegmentOrder.getPriorityOrder().equals(requestedSegmentOrder.getPriorityOrder() - 1) &&
+        } else if (previousSegmentOrder.getPriorityOrder().equals(requestedSegmentOrder.getPriorityOrder() - 1) &&
                 StringUtils.equalsIgnoreCase("OA", byEquipNumberLatestStatus.getEventType())
-                ) {
+        ) {
             return Boolean.FALSE;
         }
         return Boolean.TRUE;
@@ -498,31 +710,35 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 //        final List<String> onNetworkRezEvents = onNetworkEvents.stream().filter(s -> !StringUtils.equalsIgnoreCase("ESA", s)).collect(Collectors.toList());
 
 
-
         if (onNetworkEvents.contains(request.getEventCode())) {
             preparingJoinString = request.getEventCode();
-            if(StringUtils.equalsIgnoreCase(request.getEventCode(), "ESA")){
+            if (StringUtils.equalsIgnoreCase(request.getEventCode(), "ESA")) {
                 List<String> code = Arrays.asList(request.getEventCode(), request.getLoadOption());
                 preparingJoinString = code.stream().collect(Collectors.joining("_"));
             }
         } else if (offNetworkEvents.contains(request.getEventCode())) {
             preparingJoinString = request.getEventCode();
-        } else if (StringUtils.isNotEmpty(request.getLoadOption())) {
+        } else if (StringUtils.equalsIgnoreCase("UICD",request.getEventCode())){
+            String[] streetEquipStatus = new String[2];
+            streetEquipStatus[0] = request.getStreetStatusDesc();
+            streetEquipStatus[1] = request.getEquipStatusDesc();
+            return  streetEquipStatus;
+        }else if (StringUtils.isNotEmpty(request.getLoadOption())) {
             List<String> code = Arrays.asList(request.getSegmentType(), request.getEventCode(), request.getLoadOption());
             preparingJoinString = code.stream().collect(Collectors.joining("_"));
-        } else {
-            if(request.getSegmentOrders().stream().anyMatch(s -> s.getSegmentType().equalsIgnoreCase("X")) && request.getEventCode().equalsIgnoreCase("OA")){
+        }else {
+            if (request.getSegmentOrders().stream().anyMatch(s -> s.getSegmentType().equalsIgnoreCase("X")) && request.getEventCode().equalsIgnoreCase("OA")) {
                 final Optional<SegmentOrder> first = request.getSegmentOrders().stream().filter(s -> s.getPriorityOrder().equals(2)).findFirst();
-                if(first.isPresent() && first.get().getSegmentNumber().equalsIgnoreCase(request.getSegmentNumber())){
+                if (first.isPresent() && first.get().getSegmentNumber().equalsIgnoreCase(request.getSegmentNumber())) {
                     //Cross town tansit
                     List<String> code = Arrays.asList("RX", request.getEventCode());
                     preparingJoinString = code.stream().collect(Collectors.joining("_"));
 
-                }else{
+                } else {
                     List<String> code = Arrays.asList(request.getSegmentType(), request.getEventCode());
                     preparingJoinString = code.stream().collect(Collectors.joining("_"));
                 }
-            }else{
+            } else {
                 List<String> code = Arrays.asList(request.getSegmentType(), request.getEventCode());
                 preparingJoinString = code.stream().collect(Collectors.joining("_"));
             }
@@ -549,48 +765,57 @@ public class EventProgressionServiceImpl implements EventProgressionService {
         latestStatus.setEventType(request.getEventCode());
         latestStatus.setEventDate(request.getEventDate());
         latestStatus.setSegmentNumber(request.getSegmentNumber());
-        latestStatus.setTransaction(transaction);
+//        latestStatus.setTransaction(transaction);
         latestStatus.setLoadOption(request.getLoadOption());
 
         return equipmentLatestStatusRepository.save(latestStatus);
     }
 
+
     private StatusHistoryLog prepareStatusHistoryLog(Transaction transaction, EquipmentEventRequest request) {
+
+        //need to find the segment and segment event priority order
+
 
         StatusHistoryLog historyLog = new StatusHistoryLog();
 
         historyLog.setTransaction(transaction);
 
-        if(StringUtils.isNotBlank(request.getEquipmentNumber())){
+        historyLog.setSegmentPriority(getSegmentOrder(request));
+        if (request.getSegmentType() != null || StringUtils.equalsIgnoreCase("UICD", request.getEventCode())) {
+            historyLog.setSegmentEventPriority(getSegmentEventOrder(request));
+        }
+
+        if (StringUtils.isNotBlank(request.getEquipmentNumber())) {
             historyLog.setEquipNumber(request.getEquipmentNumber());
         }
 
         historyLog.setEventDate(request.getEventDate());
 
-        if(StringUtils.isNotBlank(request.getTrackingNum())){
+        if (StringUtils.isNotBlank(request.getTrackingNum())) {
             historyLog.setTrackingNumber(request.getTrackingNum());
         }
 
         historyLog.setLoadOption(request.getLoadOption());
 
-        if(StringUtils.isNotBlank(request.getEventCarrier())){
+        if (StringUtils.isNotBlank(request.getEventCarrier())) {
 
             historyLog.setEventCarrier(request.getEventCarrier());
         }
 
-        if(StringUtils.isNotBlank(request.getEventSplc())){
+        if (StringUtils.isNotBlank(request.getEventSplc())) {
 
             historyLog.setEventSplc(request.getEventSplc());
         }
 
         historyLog.setEventType(request.getEventCode());
 
-        if(StringUtils.isNotBlank(request.getShipmentNumber())){
+        if (StringUtils.isNotBlank(request.getShipmentNumber())) {
 
             historyLog.setShipmentNumber(request.getShipmentNumber());
         }
 
-        if(StringUtils.isNotBlank(request.getSegmentNumber())){
+        if (StringUtils.isNotBlank(request.getSegmentNumber())) {
 
             historyLog.setSegmentNumber(request.getSegmentNumber());
         }
@@ -606,7 +831,7 @@ public class EventProgressionServiceImpl implements EventProgressionService {
     }
 
 
-    private Transaction validateESAforTransaction(EquipmentEventRequest request){
+    private Transaction validateESAforTransaction(EquipmentEventRequest request) {
         /*
             IF SEGMENT TYPE IS ER
                 STEP 1: FIND THE EQUIPMENT LOAD OPTION FROM ELS
@@ -615,14 +840,14 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                 ELSE
                     FIND ACTIVE TRANSACTION BY EQUIPMENT AND SHIPMENT NUMBER
              */
-        if (StringUtils.isNotBlank(request.getSegmentType()) && request.getSegmentType().equalsIgnoreCase("ER")){
+        if (StringUtils.isNotBlank(request.getSegmentType()) && request.getSegmentType().equalsIgnoreCase("ER")) {
             final EquipmentLatestStatus byEquipNumber = equipmentLatestStatusRepository.findByEquipNumber(request.getEquipmentNumber());
-            if(byEquipNumber.getLoadOption().equalsIgnoreCase("DROP")){
-               return transactionRepository.findByEquipNumberAndStatus(request.getEquipmentNumber(), "A");
-            }else{
+            if (byEquipNumber.getLoadOption().equalsIgnoreCase("DROP")) {
+                return transactionRepository.findByEquipNumberAndStatus(request.getEquipmentNumber(), "A");
+            } else {
                 return transactionRepository.findByEquipNumberAndShipmentNumber(request.getEquipmentNumber(), request.getShipmentNumber());
             }
-        }else{
+        } else {
             return transactionRepository.findByEquipNumberAndShipmentNumber(request.getEquipmentNumber(), request.getShipmentNumber());
         }
     }
@@ -631,9 +856,9 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
         final Transaction dbTransactionStatus;
 
-        if (Arrays.asList("RC","OE","IT").contains(request.getEventCode())) {
+        if (Arrays.asList("RC", "OE", "IT").contains(request.getEventCode())) {
             dbTransactionStatus = transactionRepository.findByRezTrackingNumber(request.getTrackingNum());
-        }  else if (StringUtils.equalsIgnoreCase("ESA", request.getEventCode())) {
+        } else if (StringUtils.equalsIgnoreCase("ESA", request.getEventCode())) {
             dbTransactionStatus = validateESAforTransaction(request);
         } else {
             dbTransactionStatus = transactionRepository.findByEquipNumberAndStatus(request.getEquipmentNumber(), "A");
@@ -671,17 +896,17 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
             dbTransactionStatus.setEquipNumber(request.getEquipmentNumber());
 
-            if(validateInputRequest(request.getTrackingNum(),dbTransactionStatus.getRezTrackingNumber())){
+            if (validateInputRequest(request.getTrackingNum(), dbTransactionStatus.getRezTrackingNumber())) {
                 dbTransactionStatus.setRezTrackingNumber(request.getTrackingNum());
             }
 
             dbTransactionStatus.setCurrentEventCode(request.getEventCode());
 
-            if(validateInputRequest(request.getShipmentNumber(),dbTransactionStatus.getShipmentNumber())){
+            if (validateInputRequest(request.getShipmentNumber(), dbTransactionStatus.getShipmentNumber())) {
                 dbTransactionStatus.setShipmentNumber(request.getShipmentNumber());
             }
 
-            if(validateInputRequest(request.getSegmentNumber(),dbTransactionStatus.getSegmentNumber())){
+            if (validateInputRequest(request.getSegmentNumber(), dbTransactionStatus.getSegmentNumber())) {
                 dbTransactionStatus.setSegmentNumber(request.getSegmentNumber());
             }
 
@@ -690,8 +915,8 @@ public class EventProgressionServiceImpl implements EventProgressionService {
     }
 
 
-    private  Boolean validateInputRequest(String inputRequestValue, String existingValue){
-        return  StringUtils.isNotEmpty(inputRequestValue) && StringUtils.isBlank(existingValue);
+    private Boolean validateInputRequest(String inputRequestValue, String existingValue) {
+        return StringUtils.isNotEmpty(inputRequestValue) && StringUtils.isBlank(existingValue);
     }
 
 
@@ -759,15 +984,14 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                 transactionRepository.saveAll(transactions);
             } else {
 
-                final List<Transaction> byEquipNumberAndRezTrackingNumberNotNull = transactionRepository.findByEquipNumberAndStatusAndRezTrackingNumberNotNull(request.getEquipmentNumber(), "A");
+               Transaction byEquipNumberAndRezTrackingNumberNotNull = transactionRepository.findByEquipNumberAndStatusAndRezTrackingNumberNotNull(request.getEquipmentNumber(), "A");
 
-                if (CollectionUtils.isNotEmpty(byEquipNumberAndRezTrackingNumberNotNull)) {
-                    byEquipNumberAndRezTrackingNumberNotNull.forEach(t -> {
-                        t.setShipmentNumber(request.getShipmentNumber());
-                        t.setCurrentEventCode(request.getEventCode());
-                    });
+                if (byEquipNumberAndRezTrackingNumberNotNull != null) {
 
-                    return transactionRepository.saveAll(byEquipNumberAndRezTrackingNumberNotNull).iterator().next();
+                        byEquipNumberAndRezTrackingNumberNotNull.setShipmentNumber(request.getShipmentNumber());
+                        byEquipNumberAndRezTrackingNumberNotNull.setCurrentEventCode(request.getEventCode());
+
+                    return transactionRepository.save(byEquipNumberAndRezTrackingNumberNotNull);
                 }
             }
 

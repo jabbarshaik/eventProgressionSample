@@ -8,7 +8,7 @@ import java.util.Map;
 public enum OriginBundledSegmentEventPriority {
 
 
-    X3("X3",1),AF("AF",2), NT("NT",3), OA("OA",4);
+    X3("X3",1),AF("AF",2), I("I",3), IL("IL",4),RL("RL",5),ETD("ETD",6), ETA("ETA",7), X6("X6",8),UR("UR",9),ETG("ETG",10), NT("NT",11), NF("NF",12),OA("OA",13);
 
     private String  code;
     private Integer priority;

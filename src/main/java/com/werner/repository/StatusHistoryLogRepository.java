@@ -9,4 +9,9 @@ import java.util.List;
 public interface StatusHistoryLogRepository extends CrudRepository<StatusHistoryLog, Long> {
 
     List<StatusHistoryLog> findByTransaction(Transaction transaction);
+
+    StatusHistoryLog findTopByTransactionAndSegmentPriorityNotNullOrderBySegmentPriorityDescSegmentEventPriorityDesc(Transaction transaction);
+
+//    StatusHistoryLog findTopByEquipNumberAndSegmentPriorityNotNullOrderBySegmentPriorityDescSegmentEventPriorityDesc(Transaction transaction);
 }
+

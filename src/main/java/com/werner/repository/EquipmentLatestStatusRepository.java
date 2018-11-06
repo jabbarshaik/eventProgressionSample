@@ -10,5 +10,4 @@ public interface EquipmentLatestStatusRepository extends CrudRepository<Equipmen
 
     EquipmentLatestStatus findByEquipNumber(String equipNumber);
 
-    EquipmentLatestStatus findByTransaction(Transaction transaction);
 }

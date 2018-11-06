@@ -30,8 +30,11 @@ public interface TransactionRepository extends CrudRepository<Transaction,Long> 
 
     List<Transaction> findByShipmentNumberAndStatusAndEquipNumberNotNull(String shipmentNumber, String status);
 
-    List<Transaction> findByEquipNumberAndStatusAndRezTrackingNumberNotNull(String equipNumber, String status);
+    Transaction findByEquipNumberAndStatusAndRezTrackingNumberNotNull(String equipNumber, String status);
 
     Transaction findByEquipNumberAndRezTrackingNumberNotNull(String equipNumber);
+
+
+    Transaction findByEquipNumberAndRezTrackingNumber(String equipNumber,String rezTrackingNumber);
 
 }

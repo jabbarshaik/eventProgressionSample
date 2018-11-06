@@ -32,6 +32,8 @@ public class StatusHistoryLog extends  BaseAuditType {
     private String loadOption;
     private String eventCarrier;
     private String eventSplc;
+    private Integer segmentPriority;
+    private Integer segmentEventPriority;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "transactionId", referencedColumnName = "transactionId")

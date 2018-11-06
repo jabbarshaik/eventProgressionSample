@@ -29,9 +29,9 @@ public class EquipmentLatestStatus extends  BaseAuditType{
 
     private String loadOption;
 
-    @OneToOne
+    /*@OneToOne
     @JoinColumn(name = "transactionId", referencedColumnName = "transactionId")
-    private Transaction transaction;
+    private Transaction transaction;*/
 
     public EquipmentLatestStatus(){
 
