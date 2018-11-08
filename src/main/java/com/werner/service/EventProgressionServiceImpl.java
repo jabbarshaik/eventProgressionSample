@@ -616,15 +616,15 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                         if (RailSegmentEventPriority.getRailSegmentEventPriority(request.getEventCode()) != null
                                 && Arrays.asList("R", "ER").contains(requestedSegmentOrder.get().getSegmentType()) &&
                                     RailSegmentEventPriority.getRailSegmentEventPriority(byEquipNumberLatestStatus.getEventType()) != null) {
-                            return RailSegmentEventPriority.getRailSegmentEventPriority(request.getEventCode()) > RailSegmentEventPriority.getRailSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
+                            return RailSegmentEventPriority.getRailSegmentEventPriority(request.getEventCode()) >= RailSegmentEventPriority.getRailSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
                         } else if (DraySegmentEventPriority.getDraySegmentEventPriority(request.getEventCode()) != null && Arrays.asList("O", "D", "X").contains(requestedSegmentOrder.get().getSegmentType())) {
-                            return DraySegmentEventPriority.getDraySegmentEventPriority(request.getEventCode()) > DraySegmentEventPriority.getDraySegmentEventPriority(byEquipNumberLatestStatus.getEventType());
+                            return DraySegmentEventPriority.getDraySegmentEventPriority(request.getEventCode()) >= DraySegmentEventPriority.getDraySegmentEventPriority(byEquipNumberLatestStatus.getEventType());
                         } else if (BundledSegmentEventPriority.getBundledSegmentEventPriority(request.getEventCode()) != null && Arrays.asList("B").contains(requestedSegmentOrder.get().getSegmentType())) {
-                            return BundledSegmentEventPriority.getBundledSegmentEventPriority(request.getEventCode()) > BundledSegmentEventPriority.getBundledSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
+                            return BundledSegmentEventPriority.getBundledSegmentEventPriority(request.getEventCode()) >= BundledSegmentEventPriority.getBundledSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
                         } else if (OriginBundledSegmentEventPriority.getOriginBundledSegmentEventPriority(request.getEventCode()) != null && Arrays.asList("OB").contains(requestedSegmentOrder.get().getSegmentType())) {
-                            return OriginBundledSegmentEventPriority.getOriginBundledSegmentEventPriority(request.getEventCode()) > OriginBundledSegmentEventPriority.getOriginBundledSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
+                            return OriginBundledSegmentEventPriority.getOriginBundledSegmentEventPriority(request.getEventCode()) >= OriginBundledSegmentEventPriority.getOriginBundledSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
                         } else if (DestinationBundledSegmentEventPriority.getDestinationBundledSegmentEventPriority(request.getEventCode()) != null && Arrays.asList("DB").contains(requestedSegmentOrder.get().getSegmentType())) {
-                            return DestinationBundledSegmentEventPriority.getDestinationBundledSegmentEventPriority(request.getEventCode()) > DestinationBundledSegmentEventPriority.getDestinationBundledSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
+                            return DestinationBundledSegmentEventPriority.getDestinationBundledSegmentEventPriority(request.getEventCode()) >= DestinationBundledSegmentEventPriority.getDestinationBundledSegmentEventPriority(byEquipNumberLatestStatus.getEventType());
                         } else if(StringUtils.equalsIgnoreCase("UICD", request.getEventCode())){
                             if(StringUtils.equalsIgnoreCase("D", request.getSegmentType())){
                                 Integer segmentEventPriority = DraySegmentEventPriority.getDraySegmentEventPriority(byEquipNumberLatestStatus.getEventType());
