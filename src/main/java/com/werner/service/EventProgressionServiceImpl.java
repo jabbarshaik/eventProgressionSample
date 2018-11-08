@@ -63,7 +63,7 @@ public class EventProgressionServiceImpl implements EventProgressionService {
             for (EquipmentEventRequest request : requests) {
                 Transaction transaction = null;
                 Transaction existingTransaction = null;
-                if (onNetworkEvents.contains(request.getEventCode())) {
+                if ((StringUtils.equalsIgnoreCase("RC", request.getEventCode()) && StringUtils.isBlank(request.getEquipmentNumber())) || onNetworkEvents.contains(request.getEventCode())) {
                     transaction = prepareTransaction(request);
                     existingTransaction = transaction;
                 } else if (offNetworkEvents.contains(request.getEventCode())) {
@@ -105,7 +105,8 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
                 } else if (cancellationEvents.contains(request.getEventCode())) {
 
-                    processCancellationEvents(request);
+                    transaction = processCancellationEvents(request);
+                    existingTransaction = transaction;
 
                 } else {
 
@@ -284,10 +285,9 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                 // Step - 3 validate business rules and save into equipment latest status
                 EquipmentLatestStatus equipmentLatestStatus = new EquipmentLatestStatus();
 
-                if(StringUtils.equalsIgnoreCase("A",transaction.getStatus())){
+                if(offNetworkEvents.contains(request.getEventCode()) || StringUtils.equalsIgnoreCase("A",transaction.getStatus())){
                     equipmentLatestStatus = prepareEquipmentLatestStatus(request, existingTransaction, transaction,statusHistoryLog);
                 }
-
 
                 prepareResponse(response, equipmentLatestStatus);
 
@@ -303,19 +303,19 @@ public class EventProgressionServiceImpl implements EventProgressionService {
         return response;
     }
 
-    private void processCancellationEvents(EquipmentEventRequest request) {
+    private Transaction processCancellationEvents(EquipmentEventRequest request) {
 
         final Transaction transaction;
 
         if (Arrays.asList("RX", "RE").contains(request.getEventCode())) {
             transaction = transactionRepository.findByRezTrackingNumber(request.getTrackingNum());
 
-            updateTransactionWithStatus(request, transaction, "C");
+            return updateTransactionWithStatus(request, transaction, StringUtils.equalsIgnoreCase("RE", request.getEventCode()) ? "E" : "C");
         } else if (StringUtils.equalsIgnoreCase("TC", request.getEventCode())) {
 
             transaction = transactionRepository.findByEquipNumberAndRezTrackingNumber(request.getEquipmentNumber(), request.getTrackingNum());
 
-            updateTransactionWithStatus(request, transaction, "C");
+           return updateTransactionWithStatus(request, transaction, "C");
         } else if (StringUtils.equalsIgnoreCase("FC", request.getEventCode())) {
 
             transaction = transactionRepository.findByEquipNumberAndRezTrackingNumber(request.getEquipmentNumber(), request.getTrackingNum());
@@ -330,7 +330,7 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
         */
 
-            updateTransactionWithStatus(request, transaction, "A");
+           updateTransactionWithStatus(request, transaction, "A");
 
 
             StatusHistoryLog statusHistoryLog = statusHistoryLogRepository.findTopByTransactionAndSegmentPriorityNotNullOrderBySegmentPriorityDescSegmentEventPriorityDesc(transaction);
@@ -348,9 +348,11 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
 
         }
+
+        return  null;
     }
 
-    private void updateTransactionWithStatus(EquipmentEventRequest request, Transaction transaction, String status) {
+    private Transaction updateTransactionWithStatus(EquipmentEventRequest request, Transaction transaction, String status) {
 
         if (transaction != null) {
 
@@ -363,8 +365,10 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                 transaction.setEndDate(null);
             }
 
-            transactionRepository.save(transaction);
+            return transactionRepository.save(transaction);
         }
+
+        return null;
     }
 
     private boolean validateERWithDrop(EquipmentEventRequest request) {
@@ -404,6 +408,8 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
         final String[] streetAndEquipStatus = StringUtils.isNotBlank(request.getEquipmentNumber()) ? getStreetAndEquipStatus(request) : null;
 
+        StatusHistoryLog dbStatusHistoryLog = statusHistoryLogRepository.findTopByTransactionAndSegmentPriorityNotNullOrderBySegmentPriorityDescSegmentEventPriorityDesc(newTransaction);
+
         if (streetAndEquipStatus != null) {
 
             if (onNetworkEvents.contains(request.getEventCode())) {
@@ -412,7 +418,7 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
                 if (equipmentLatestStatus == null) {
                     return prepareEquipmentLatestStatusObject(newTransaction, request, streetAndEquipStatus[0], streetAndEquipStatus[1]);
-                } else if (request.getLoadOption() == null) {
+                } else if (dbStatusHistoryLog == null) {
 
                     equipmentLatestStatus.setStreetStatus(streetAndEquipStatus[0]);
                     equipmentLatestStatus.setEquipStatus(streetAndEquipStatus[1]);
@@ -420,6 +426,7 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                     equipmentLatestStatus.setEventType(request.getEventCode());
 //                    equipmentLatestStatus.setTransaction(newTransaction);
                     equipmentLatestStatus.setLoadOption(request.getLoadOption());
+                    equipmentLatestStatus.setSegmentNumber(request.getSegmentNumber());
 
 
                     return equipmentLatestStatusRepository.save(equipmentLatestStatus);
@@ -975,6 +982,144 @@ public class EventProgressionServiceImpl implements EventProgressionService {
 
             //if ESA received ... get all the Pending transactions on the Shipment ...if any mark then as Cancelled
 
+
+            // find by equipment and shipment is null and rez tracking is null
+
+            Transaction transaction = transactionRepository.findByShipmentNumberAndStatus(request.getShipmentNumber(), "A");
+
+            if(transaction == null){
+
+                transaction = transactionRepository.findByEquipNumberAndStatusAndShipmentNumberIsNullAndRezTrackingNumberIsNotNull(request.getEquipmentNumber(), "A");
+
+                if(transaction != null){
+                    transaction.setShipmentNumber(request.getShipmentNumber());
+                    transaction.setCurrentEventCode(request.getEventCode());
+
+                    return  transactionRepository.save(transaction);
+                }else {
+
+                    final Transaction byEquipNumberAndStatus = transactionRepository.findByEquipNumberAndStatus(request.getEquipmentNumber(), "A");
+
+                    if (byEquipNumberAndStatus != null) {
+                        byEquipNumberAndStatus.setStatus("H");
+
+                        transactionRepository.save(byEquipNumberAndStatus);
+                    }
+                }
+
+            }else{
+                /*
+                Step 1:
+                    Step 1.1: Update transaction equipment number with new equipment number
+                    Step 1.2: Find Status history logs based on transaction and update equipment number
+                    Step 1.3: find the highest event of the transaction from status history log and update the new equipment status
+                Step 2: Find the latest E1 historic transaction() find by equipment number and status as H
+                    Yes:
+                        2.1 Check for End dates
+                            No: Mark transaction as A
+                        2.2 Update equipment to its latest statues based on status history log of the transaction
+                    No:
+                        2.1 Mark E1 equipment as IF as its ELS
+                 */
+
+                Transaction existingTransaction = new Transaction();
+                BeanUtils.copyProperties(transaction,existingTransaction);
+
+
+                transaction.setEquipNumber(request.getEquipmentNumber());
+                transaction.setCurrentEventCode(request.getEventCode());
+
+                Transaction savedTransaction = transactionRepository.save(transaction);
+
+                List<StatusHistoryLog> statusHistoryLogs = statusHistoryLogRepository.findByTransaction(transaction);
+
+
+                if(CollectionUtils.isNotEmpty(statusHistoryLogs)){
+
+                    statusHistoryLogs.stream().forEach(statusHistoryLog -> statusHistoryLog.setEquipNumber(request.getEquipmentNumber()));
+
+                    statusHistoryLogRepository.saveAll(statusHistoryLogs);
+
+                    EquipmentLatestStatus equipmentLatestStatus = equipmentLatestStatusRepository.findByEquipNumber(request.getEquipmentNumber());
+
+                        StatusHistoryLog statusHistoryLog = statusHistoryLogRepository.findTopByTransactionAndSegmentPriorityNotNullOrderBySegmentPriorityDescSegmentEventPriorityDesc(transaction);
+
+                        if(statusHistoryLog != null){
+                            if (equipmentLatestStatus != null){
+                                equipmentLatestStatus.setStreetStatus(statusHistoryLog.getStreetStatus());
+                                equipmentLatestStatus.setEquipStatus(statusHistoryLog.getEquipStatus());
+                                equipmentLatestStatus.setEventType(statusHistoryLog.getEventType());
+
+                                equipmentLatestStatusRepository.save(equipmentLatestStatus);
+                            }else{
+                                EquipmentLatestStatus latestStatus = new EquipmentLatestStatus();
+
+                                latestStatus.setEquipNumber(statusHistoryLog.getEquipNumber());
+                                latestStatus.setEquipStatus(statusHistoryLog.getEquipStatus());
+                                latestStatus.setStreetStatus(statusHistoryLog.getStreetStatus());
+                                latestStatus.setEventType(statusHistoryLog.getEventType());
+                                latestStatus.setLoadOption(request.getLoadOption());
+                                latestStatus.setSegmentNumber(statusHistoryLog.getSegmentNumber());
+
+                                equipmentLatestStatusRepository.save(latestStatus);
+                            }
+
+                        }
+
+
+                }
+
+
+                Transaction historicTransaction = transactionRepository.findByEquipNumberAndStatusIn(existingTransaction.getEquipNumber(), Arrays.asList("A", "H"));
+
+                if(historicTransaction != null){
+
+                    if(StringUtils.isBlank(historicTransaction.getEndDate())){
+
+                        historicTransaction.setStatus("A");
+                        transactionRepository.save(historicTransaction);
+
+
+                        StatusHistoryLog statusHistoryLog = statusHistoryLogRepository.findTopByTransactionAndSegmentPriorityNotNullOrderBySegmentPriorityDescSegmentEventPriorityDesc(historicTransaction);
+
+                        if(statusHistoryLog != null){
+
+                            EquipmentLatestStatus existingEquipmentLatestStatus = equipmentLatestStatusRepository.findByEquipNumber(existingTransaction.getEquipNumber());
+
+                            if(existingEquipmentLatestStatus != null){
+
+                                existingEquipmentLatestStatus.setStreetStatus(statusHistoryLog.getStreetStatus());
+                                existingEquipmentLatestStatus.setEquipStatus(statusHistoryLog.getEquipStatus());
+
+                                equipmentLatestStatusRepository.save(existingEquipmentLatestStatus);
+                            }
+
+                        }
+                    }
+
+                }else{
+
+                    //Mark equipment has OFNET
+
+                    EquipmentLatestStatus existingEquipmentLatestStatus = equipmentLatestStatusRepository.findByEquipNumber(existingTransaction.getEquipNumber());
+
+                    if(existingEquipmentLatestStatus != null){
+
+                        existingEquipmentLatestStatus.setEquipStatus("EMPTY");
+                        existingEquipmentLatestStatus.setStreetStatus("OFNET");
+
+                        equipmentLatestStatusRepository.save(existingEquipmentLatestStatus);
+                    }
+                }
+
+                return savedTransaction;
+
+
+            }
+
+
+
+/*
             final List<Transaction> transactions = transactionRepository.findByShipmentNumberAndStatusAndEquipNumberNotNull(request.getShipmentNumber(), "A");
 
             if (!CollectionUtils.isEmpty(transactions)) {
@@ -1001,7 +1146,7 @@ public class EventProgressionServiceImpl implements EventProgressionService {
                 byEquipNumberAndStatus.setStatus("H");
 
                 transactionRepository.save(byEquipNumberAndStatus);
-            }
+            }*/
         }
         return null;
     }

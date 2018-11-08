@@ -12,6 +12,10 @@ public interface StatusHistoryLogRepository extends CrudRepository<StatusHistory
 
     StatusHistoryLog findTopByTransactionAndSegmentPriorityNotNullOrderBySegmentPriorityDescSegmentEventPriorityDesc(Transaction transaction);
 
+    List<StatusHistoryLog> findByTransactionOrderBySegmentPriorityDescSegmentEventPriorityDesc(Transaction transaction);
+
+
+
 //    StatusHistoryLog findTopByEquipNumberAndSegmentPriorityNotNullOrderBySegmentPriorityDescSegmentEventPriorityDesc(Transaction transaction);
 }
 

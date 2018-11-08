@@ -8,7 +8,7 @@ import java.util.Map;
 public enum RailSegmentEventPriority {
 
 
-    I("I",1),IL("IL",2), RL("RL",3),ETD("ETD",4),ETA("ETA",5),LPH("LPH", 6),DERAMPED("DERAMPED", 7), ETG("ETG",8),NT("NT",9),NF("NF",10),OA("OA",11);
+    I("I",1),IL("IL",2), RD("RD",3),RC("RC", 4),RL("RL",5),ETD("ETD",6),ETA("ETA",7),LPH("LPH", 8),DERAMPED("DERAMPED", 9), ETG("ETG",10),NT("NT",11),NF("NF",12),OA("OA",13);
 
     private String  code;
     private Integer priority;

@@ -82,7 +82,11 @@ public enum EventCodeMappingEnum {
 // I("I",1),IL("IL",2), RL("RL",3),ETD("ETD",4),ETA("ETA",5),LPH("LPH", 6),DERAMPED("DERAMPED", 7), ETG("ETG",8),NT("NT",9),NF("NF",10),OA("OA",11);
 
 
-    INGATE("R_I", Arrays.asList(StreetAndEquipConstants.ORIGIN_RAMP, StreetAndEquipConstants.LOADED)),
+    I("R_I", Arrays.asList(StreetAndEquipConstants.ORIGIN_RAMP, StreetAndEquipConstants.LOADED)),
+
+    RC("R_RC", Arrays.asList(StreetAndEquipConstants.ORIGIN_RAMP, StreetAndEquipConstants.LOADED)),
+
+    RD("R_RD", Arrays.asList(StreetAndEquipConstants.ORIGIN_RAMP, StreetAndEquipConstants.LOADED)),
 
     IL("R_IL", Arrays.asList(StreetAndEquipConstants.ORIGIN_RAMP, StreetAndEquipConstants.LOADED)),
 
@@ -94,7 +98,7 @@ public enum EventCodeMappingEnum {
 
     LPH("R_LPH", Arrays.asList(StreetAndEquipConstants.RAIL_TRANSIT, StreetAndEquipConstants.LOADED)),
 
-    DERAMPED("R_DERAMPED", Arrays.asList(StreetAndEquipConstants.DESTINATION_RAMP, StreetAndEquipConstants.LOADED)),
+    UR("R_UR", Arrays.asList(StreetAndEquipConstants.DESTINATION_RAMP, StreetAndEquipConstants.LOADED)),
 
     ETG("R_ETG", Arrays.asList(StreetAndEquipConstants.DESTINATION_RAMP, StreetAndEquipConstants.LOADED)),
 
@@ -107,7 +111,7 @@ public enum EventCodeMappingEnum {
     X_OA("RX_OA", Arrays.asList(StreetAndEquipConstants.CROSSTOWN_TRANSIT, StreetAndEquipConstants.LOADED)),
 
 
-    ER_INGATE("ER_I", Arrays.asList(StreetAndEquipConstants.ORIGIN_RAMP, StreetAndEquipConstants.EMPTY)),
+    ER_I("ER_I", Arrays.asList(StreetAndEquipConstants.ORIGIN_RAMP, StreetAndEquipConstants.EMPTY)),
 
     ER_IL("ER_IL", Arrays.asList(StreetAndEquipConstants.ORIGIN_RAMP, StreetAndEquipConstants.EMPTY)),
 
@@ -119,7 +123,7 @@ public enum EventCodeMappingEnum {
 
     ER_LPH("ER_LPH", Arrays.asList(StreetAndEquipConstants.RAIL_TRANSIT, StreetAndEquipConstants.EMPTY)),
 
-    ER_DERAMPED("ER_DERAMPED", Arrays.asList(StreetAndEquipConstants.DESTINATION_RAMP, StreetAndEquipConstants.EMPTY)),
+    ER_UR("ER_UR", Arrays.asList(StreetAndEquipConstants.DESTINATION_RAMP, StreetAndEquipConstants.EMPTY)),
 
     ER_ETG("ER_ETG", Arrays.asList(StreetAndEquipConstants.DESTINATION_RAMP, StreetAndEquipConstants.EMPTY)),
 
@@ -144,7 +148,7 @@ public enum EventCodeMappingEnum {
     D_CD_DROP("D_CD_DROP", Arrays.asList(StreetAndEquipConstants.DESTINATION_STREET, StreetAndEquipConstants.PLACED_FOR_UNLOADING)),
 
 //on network events
-    RC("RC", Arrays.asList(StreetAndEquipConstants.ORIGIN_RAMP, StreetAndEquipConstants.LOADED)),
+
     OE("OE", Arrays.asList(StreetAndEquipConstants.ORIGIN_STREET, StreetAndEquipConstants.EMPTY)),
     IT("IT", Arrays.asList(StreetAndEquipConstants.ORIGIN_STREET, StreetAndEquipConstants.EMPTY)),
     ESA_LIVE("ESA_LIVE", Arrays.asList(StreetAndEquipConstants.ORIGIN_STREET, StreetAndEquipConstants.LOADING)),
